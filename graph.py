@@ -1,7 +1,8 @@
 import numpy as np
 import networkx as nx
 from tqdm import tqdm
-
+from pyvis.network import Network
+import matplotlib.pyplot as plt
 class graph:
 
     def __init__(self):
@@ -11,31 +12,43 @@ class graph:
         self.arclist = []
         self.path_dfs = []
         self.parent_list = []
-
+        self.temp_read_file_name = []
     def create_nodes(self, m):
         tmp = [node() for i in range(m)]
         self.node_list = self.node_list  +tmp
         self.parent_list = self.node_list.copy()
         return tmp
 
-    def read_file(self,name):
-        file1 = open(name, "r+")
-        file1.seek(0)
-        a = file1.readlines()
-        for i in range(len(a)):
-            a[i] = a[i].replace("\n", "")
-            a[i] = a[i].split(" ")
-            a[i] = list(map(int, a[i]))
+    def read_file(self,name,overwrite=0):
+        
+        if self.temp_read_file_name!=name or overwrite==1:
+            #print("Reading file:",name)
+            self.temp_read_file_name = name
+            file1 = open(name, "r+")
+            file1.seek(0)
+            a = file1.readlines()
+            a[0] = a[0].replace("\n", "")
+            a[0] = a[0].split(" ")
+            a[0] = list(map(int, a[0]))
 
-        self.add_arcs(a)
-        return a
+            for i in range(1,len(a)):
+                a[i] = a[i].replace("\n", "")
+                a[i] = a[i].split(" ")
+                #a[i] = list(map(float, a[i]))
+                a[i] = [int(a[i][0]),int(a[i][1]),float(a[i][2]),float(a[i][3])]
 
+                #a[i] = [int(a[i][0]),int(a[i][1]),np.float(a[i][2]),np.float(a[i][3])]
+
+            self.add_arcs(a)
+            return a
+        else:
+            print("File already in buffer, change overwrite parameter to reread the file")
     def add_arcs(self, n):
         if isinstance(n, dict):
             for a in n.keys():
                 a.addchild(n[a])
         else:
-            for i in tqdm(range(len(n)),desc="Loading File"):
+            for i in tqdm(range(len(n)),desc="Loading File:"+self.temp_read_file_name):
                 if i == 0:
                     self.create_nodes(n[i][0])
                 else:
@@ -94,74 +107,124 @@ class graph:
                 obj[arr[0][i]].addchild([obj[arr[1][i]]])
         return self.getgraph()
 
-    def draw(self, d=None):
-
+    def draw(self,size = 12, d=None):
+        print("\n ********** In plotting function *********")
+        net = Network(notebook=True)
         if d == None:
             d = self.getgraph()
 
         g = nx.DiGraph()
         g.add_nodes_from(d.keys())
         for k, v in d.items():
-            g.add_edges_from(([(k, t) for t in v]))
-
-        nx.draw(g, with_labels=True)
-
-    def dfs(self, s, e=None):
+            #g.add_edges_from(([(k, t) for t in v]))
+            g.add_weighted_edges_from(([(k, t,k.getcost(t)) for t in v]))
+        
+        plt.figure(figsize=(size,size))
+        
+        try:
+            pos=nx.planar_layout(g) 
+            nx.draw_networkx(g,pos)
+            labels = nx.get_edge_attributes(g,'weight')
+            nx.draw_networkx_edge_labels(g,pos,edge_labels=labels)
+        except:
+            print("Change plot function type to spring")
+        plt.show()
+        #nx.draw_planar(g, with_labels=True)
+        #nx.draw_spring(g, with_labels=True)
+        #print(g)
+        #net.from_nx(g)
+        #net.show("example.html")
+        
+    def dfs(self, s, e=None,verbose="off"):
+        print("\n********** Performing Depth first search using DFS method ***********")
         if isinstance(s,int):
             s = self.node_list[s]
         if isinstance(e,int):
             e = self.node_list[e]
-        visited = []
+        self.visited = []
+        
         path = []
-        visited.append(s)
+        self.visited.append(s)
+      
         path.append(s)
         self.path_dfs = []
+        self.path_dfs_2 = []
 
-        self.dfs_algo(visited, path, s, e)
-        if set(visited) == set(self.node_list):
-            print("All nodes can be visited")
+        self.dfs_algo( path, s, e,verbose)
+       
+        if set(self.visited) == set(self.node_list):
+            print("All nodes CAN be visited, returning visited nodes and paths")
         else:
-            print("Nodes that haven't be visited:" + str(set(self.node_list) - set(visited)))
-        return (visited, self.path_dfs)
+            print("All nodes CANT be visited, returning visited nodes and paths")
+            #print("Nodes that haven't be visited:" + str(set(self.node_list) - set(self.visited)))
+        return (self.visited, self.path_dfs, self.path_dfs_2)
 
-    def dfs_algo(self, visited, path, s, e):
-
-        for i in s.getchild():
-            if i not in visited:
-                visited.append(i)
-                if e == i:
-
-                    self.path_dfs = (path + [i])
-                    break
-                else:
-                    try:
-                        self.dfs_algo(visited, path + [i], i, e)
-                    except:
-                        print(i)
-                        print(self.dfs_algo(visited, path, i, e))
+    def dfs_algo(self,  path, s, e,verbose="off"):
+        if verbose=="on":
+            print("Visited nodes list:",self.visited)
+        connected = [a for a in s.getchild() if a not in self.visited]
+        self.visited = self.visited + connected
+        for i in connected:
+            i.temp_parent = s
+            
+            if e == i:
+                # Returning Path using back tracking algorithm, self.path_dfs is actual path
+                self.path_dfs = (path + [i])
+                prt = e
+                path = []
+                while 1:
+                    
+                    if prt==self.visited[0]:
+                        #print("In Loop",path,prt)
+                        self.path_dfs_2 =  [prt]+path
+                        break
+                    else:
+                        path =[prt]+path
                         
-    def search(self,s,e=None,method = "bfs"):
+                        prt = prt.temp_parent
+                break
+            else:
+                try:
+                    self.dfs_algo( path + [i], i, e,verbose)
+                except:
+                    print(i)
+                    print(self.dfs_algo( path, i, e))
+
+        
+    def search(self,s,e=None,method = "bfs",verbose="off"):
+        if method=="bfs":
+            print("\n**********Performing BFS using Search method**********")
+        else:
+            print("\n**********Performing DFS using Search method**********")
+        # Node checking
         if isinstance(s,int):
             s = self.node_list[s]
         if isinstance(e,int):
             e = self.node_list[e]
         
-        qu = [s];
-        unexpl = self.node_list.copy()
-        
+        active = [s];
+        unseen = self.node_list.copy()
+        unseen.remove(s)
         visited = [];
-       
-        
-        while not (unexpl ==[] or qu==[]): 
+        vis_act = [0]*len(self.node_list)
+        vis_act[s.num]=1
+        while (active!=[]): 
  
-            s = qu[0]
+            s = active[0]
+            if verbose=="on":
+                print("Node under inspection, Active and Unseen:",end="")
+                print(s,active,unseen)
             visited.append(s)
+            active.remove(s)
             
+            # Path tracing algorithm if destination node found
             if s == e:
+                print("Path found, returing path")
                 prt = e
                 path = []
                 while 1:
                     if prt==visited[0]:
+                        
                         return [prt]+path
                     else:
                         path =[prt]+path
@@ -170,27 +233,32 @@ class graph:
                    
                     
             
-            #tmp = [a for a in s.getchild() if a not in visited and a not in qu]
-            tmp   = list(set(s.getchild()) - set(visited) - set(qu))
+            #tmp = [a for a in s.getchild() if a not in visited and a not in active]
+            tmp = [a for a in s.getchild() if vis_act[a.num]==0]
+            #tmp   = list(set(s.getchild()) - set(visited)-set(active)) # Same as checking child in unseen but faster
+            
+            # Adding temp parent for path tracing
             for i in tmp:
                 i.temp_parent = s
+                vis_act[i.num]=1
             #self.parent_list = np.array(self.parent_list)
             #self.parent_list[tmp] = s
             
             if method == "bfs":
-                qu =  qu + tmp
+                active =  active + tmp
                
             else:
-                qu = tmp + qu
-               
-            qu.remove(s)
-            #print(s,unexpl,qu)
-            unexpl.remove(s)
-           
-        #print(self.node_list)  
-        return (visited, unexpl)
+                active = tmp + active
+            
+            
+            unseen = list(set(unseen) - set(tmp))
+            
+            
+        print("No Path found, returning visited and unseen")
+        return (visited, unseen)
         
-    def mod_bell_ford(self,s,e):
+    def mod_bell_ford(self,s,e,verbose="on"):
+        print("\n**********Modified Bellman-Ford algorithm**********")
         if isinstance(s,int):
             s = self.node_list[s]
         if isinstance(e,int):
@@ -211,12 +279,60 @@ class graph:
                     i[1].dist = i[0].dist+i[0].getcost(i[1])
                     i[1].temp_parent = i[0]
                     change=True
-            print("\n"+"Iteration:"+str(iter1))
+            if verbose=="on":
+                print("\n"+"Iteration:"+str(iter1+1))
             for i in self.node_list:
                 print(i.dist,end=" ")
             iter1=iter1+1;
                     
         if e.dist==np.inf:
+            print("\nPath not found")
+        else:
+            path = []
+            print("\nPath found")
+            prt = e
+            while 1:
+                if prt==s:
+                    return [prt]+path
+                else:
+                    path =[prt]+path
+                    prt = prt.temp_parent
+                    
+    def bell_ford(self,s,e,verbose="on"):
+        #dist_matrix  = list(np.full((1,len(self.node_list)),np.inf))
+        print("\n***********Bellman-Ford algorithm***********")
+        dist = [np.inf]*len(self.node_list)
+        
+        distmat = [dist]
+        if isinstance(s,int):
+            s = self.node_list[s]
+        if isinstance(e,int):
+            e = self.node_list[e] 
+            
+        dist[s.num]=0
+        change = True
+        self.getarclist()
+        iter1=0
+        
+        while(change ==True):
+            change = False
+            dist_copy = dist.copy()
+            for i in self.arclist:
+                if(dist[i[1].num] >dist[i[0].num]+i[0].getcost(i[1])):
+                    dist_copy[i[1].num] = dist[i[0].num]+i[0].getcost(i[1])
+                    i[1].temp_parent = i[0]
+                    change=True
+                distmat.append(dist_copy)
+            
+            dist = dist_copy
+            if verbose=="on":
+                print("\n"+"Iteration:"+str(iter1+1))
+                print(dist_copy)
+            iter1=iter1+1;
+            
+
+        self.distmat=distmat            
+        if dist[e.num]==np.inf:
             print("path not found")
         else:
             path = []
