@@ -9,3 +9,8 @@ Enter this code in the cmd prompt in the directory in which these code files are
 For the cython HTML generation type the below code.
 <br>
 >> <b>cython -a algorithms.pyx</b>
+ <h2>Algorithms available </h2>
+ <ul style="list-style-type:disc;">
+  <li>Search Algorithms: BFS, DFS</li>
+  <li>Shortest Path algorithms: (Modified) Bellman ford, Floyd Warshall, Dynamic programming</li>
+</ul>
