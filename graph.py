@@ -17,6 +17,8 @@ class graph:
         self.parent_list = []
         self.temp_read_file_name = []
     def create_nodes(self, m):
+        """ Create "m" number of nodes and returns the same
+        """
         tmp = [node(num = i) for i in range(len(self.node_list),m+len(self.node_list))]
         self.node_list = self.node_list  +tmp
         self.parent_list = self.node_list.copy()
@@ -132,11 +134,12 @@ class graph:
         self.clear()
         l,m = np.shape(adj_mat)
         self.create_nodes(m)
-        arc = np.where(np.random.rand(m, m) !=np.inf)
+        arc = np.where(adj_mat !=np.inf)
         l,m  = np.shape(arc)
 
         for i in tqdm(range(m),desc="Loading graph"):
-            self.node_list[arc[0][i]].addchild([self.node_list[arc[1][i]]],[adj_mat[arc[0][i],arc[1][i]]])
+            if arc[0][i]!=arc[1][i]:
+                self.node_list[arc[0][i]].addchild([self.node_list[arc[1][i]]],[adj_mat[arc[0][i],arc[1][i]]])
         self.getarclist()
     
     def create_randgraph(self, m, density=0.5,method=None):
@@ -570,7 +573,7 @@ class graph:
         Returns 0th iteration/stage heads of Floyd Warshall algorithm
        
         """
-        if type=="node":
+        if method=="node":
             mat = np.empty((len(self.node_list),len(self.node_list)), dtype=node, order='C')
     
             for i in self.node_list:
@@ -587,43 +590,49 @@ class graph:
             
         return mat
     
-    def floyd_warshall_cyth(self):
+    def floyd_warshall_cyth(self,verbose=0):
         """  Floyd Warshall Algorithm - Cythonized to increase speeds by 100-400 times
         
         Output: Returns Shortest distance and heads (of shortest paths) from all nodes to all nodes\n
         Can be accessed through obj.D and obj.nxt
         """
+        if verbose>=1:
+            print("\n ***************Floyd Warshall Algorithm*******************")
         self.method="num"
         nxt = self.get_parent_mat(method=self.method)
             
         D = self.get_adj_mat()
-        D,nxt = floyd_warshall(len(self.node_list),D,nxt)
+        D,nxt = floyd_warshall(len(self.node_list),D,nxt,verbose)
         self.nxt = nxt
         self.D = D
         return(D,nxt)
     
     
-    def DP_cyth(self,mode=0):
+    def DP_cyth(self,mode=0,verbose=0):
         """  DP Algorithm - Cythonized to increase speeds by 100-400 times
         Input: Mode - 0/1: 0 - Optimized, 1 - Non-optimized
         Output: Returns Shortest distance and heads (of shortest paths) from all nodes to all nodes\n
         Can be accessed through obj.D and obj.nxt
         """
+        if verbose>=1:
+            print("*******************Dynamic programming routine, mode=",mode,"************************")
         self.method="num"
         nxt = self.get_parent_mat(method=self.method)
             
         D = self.get_adj_mat()
-        D,nxt = DP(len(self.node_list),D,nxt,mode)
+        D,nxt = DP(len(self.node_list),D,nxt,mode,verbose)
         self.nxt = nxt
         self.D = D
         return(D,nxt)
             
-    def floyd_warshall_naive(self):
+    def floyd_warshall_naive(self, verbose=0):
         """ Floyd Warshall Algorithm - Naive implementation     
         Output: Returns Shortest distance and heads (of shortest paths)
         from all nodes to all nodes\n
         Can be accessed through obj.D and obj.nxt
         """
+        if verbose>=1:
+            print("********* Floyd Warshall algorithm************")
         self.method = "node"
         nxt = self.get_parent_mat()
             
@@ -641,6 +650,10 @@ class graph:
                     if D[n,m]>(D[n,o]+D[o,m]):
                         D[n,m] = D[n,o]+D[o,m]
                         nxt[n,m]=nxt[n,o]
+            if verbose>=1:
+               print("\n Stage:",k.num,"\n",D)
+               if verbose>=2:
+                   input("Press Enter to continue")
         self.nxt = nxt
         self.D = D
         return(D,nxt)
@@ -763,11 +776,14 @@ class node:
         Inputs: Head of arc \n
         Output: Cost
         """
-        return self.__cost[self.__child.index(d)]
+        if d in self.__child:
+            return self.__cost[self.__child.index(d)]
+        else:
+            return np.inf
     
     def replacecost(self,d,cost):
         self.__cost[self.__child.index(d)] = cost
-    
+        
     def replacecapacity(self,d,capacity):
         self.__capacity[self.__child.index(d)] = capacity
 
@@ -777,8 +793,10 @@ class node:
         Inputs: Head of arc \n
         Output: Capacity
         """
-        return self.__capacity[self.__child.index(d)]
-
+        if d in self.__child:
+            return self.__capacity[self.__child.index(d)]
+        else:
+            return 0
     def addchild(self, child, cost=[], capacity=[]):
         """ Adding a child
         
@@ -841,12 +859,17 @@ if __name__ == "__main__":
    
     gr = graph()
     gr.clear()
+    #gr.read_file("Data/neg_no_cycle.txt")
+    #gr.read_file("Data/neg_cycle.txt")
+    #gr.read_file("Data/neg_no_cycle.txt")
+    #gr.floyd_warshall_naive(1)
+    #gr.return_path(0,1)
     #gr.read_file("Data/ExNet.txt")
     #gr.read_file("Data/InClass-2.txt")
-    gr.read_file("Data/Arbit.txt")
+    #gr.read_file("Data/Arbit.txt")
     
     #gr.create_randgraph(4,1,np.log)
-    #gr.create_randgraph(15,1,np.log)
+    gr.create_randgraph(300,0.1)
     #gr1 = gr.copy()
 
     #"""
@@ -856,6 +879,7 @@ if __name__ == "__main__":
     t3 = timecalc(gr.return_path)
     t4 = timecalc(gr.dijkstra)
     t5 = timecalc(gr.DP_cyth)
+    #t()
     #"""
     #gr.create_randgraph(500,0.01)
     #pth = gr.mod_bell_ford(0,7)
@@ -914,4 +938,4 @@ if __name__ == "__main__":
     pth = gr.search(arbitrage_node,4)[0]
     print("\nCost:",gr.get_path_cost(pth))
     """
-    print(gr.arbitrage(3))
+    #print(gr.arbitrage(1))
