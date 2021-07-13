@@ -379,11 +379,12 @@ class graph:
             if verbose>=1:
                 print("\nPath not found")
         else:
-            
+            iter1 = 0
             path = []
             if verbose>=1:
                 print("\nPath found")
             prt = e
+            tmp = len(self.node_list)
             while 1:
                 if prt==s:
                     print([prt]+path)
@@ -391,7 +392,10 @@ class graph:
                 else:
                     path =[prt]+path
                     prt = prt.temp_parent
-                    
+                iter1=iter1+1
+                if iter1>tmp:
+                    print("Negative Loop in path finding")
+                    return []
     def bell_ford(self,s,e,verbose=0):
         """
         refer to self.distmat and self.dist
@@ -615,7 +619,7 @@ class graph:
         Can be accessed through obj.D and obj.nxt
         """
         if verbose>=1:
-            print("*******************Dynamic programming routine, mode=",mode,"************************")
+            print("\n\n*******************Dynamic programming routine, mode=",mode,"************************")
         self.method="num"
         nxt = self.get_parent_mat(method=self.method)
             
@@ -632,12 +636,14 @@ class graph:
         Can be accessed through obj.D and obj.nxt
         """
         if verbose>=1:
-            print("********* Floyd Warshall algorithm************")
+            print("\n\n********* Floyd Warshall algorithm************")
         self.method = "node"
         nxt = self.get_parent_mat()
             
         D = self.get_adj_mat()
         for k in tqdm(self.node_list,"Stage"):
+            if verbose>=1:
+               print("\n Stage:",k.num,"\n",D)
             for i in self.node_list:
                 if i==k:
                     continue
@@ -648,12 +654,14 @@ class graph:
                     m = j.num
                     o = k.num
                     if D[n,m]>(D[n,o]+D[o,m]):
+                        if verbose>=1:
+                            print(" Changed",n,"->",m,"from ",D[n,m],"to ",D[n,o]+D[o,m])
                         D[n,m] = D[n,o]+D[o,m]
                         nxt[n,m]=nxt[n,o]
-            if verbose>=1:
-               print("\n Stage:",k.num,"\n",D)
-               if verbose>=2:
-                   input("Press Enter to continue")
+
+            
+            if verbose>=2:
+                input("Press Enter to continue")
         self.nxt = nxt
         self.D = D
         return(D,nxt)
@@ -859,6 +867,8 @@ if __name__ == "__main__":
    
     gr = graph()
     gr.clear()
+    gr.read_file('Data/Class_DP_ExNet.txt')
+    #gr.read_file('Data/Optimal_Loop.txt')
     #gr.read_file("Data/neg_no_cycle.txt")
     #gr.read_file("Data/neg_cycle.txt")
     #gr.read_file("Data/neg_no_cycle.txt")
@@ -869,7 +879,7 @@ if __name__ == "__main__":
     #gr.read_file("Data/Arbit.txt")
     
     #gr.create_randgraph(4,1,np.log)
-    gr.create_randgraph(300,0.1)
+    #gr.create_randgraph(300,0.1)
     #gr1 = gr.copy()
 
     #"""

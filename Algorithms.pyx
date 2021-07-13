@@ -18,9 +18,8 @@ cdef int floyd_warshall_inner(int D_shp,np.ndarray[np.float64_t, ndim=2] D,np.nd
     
     for k in range(v):
         if verbose>=1:
-            print("Stage:",v,"\n",D)
-            if verbose>=2:
-                input("Press Enter to continue")
+            print("\nStage:",k,"\n",D)
+            
             for i in range(v):
                 if i==k:
                     continue
@@ -29,10 +28,15 @@ cdef int floyd_warshall_inner(int D_shp,np.ndarray[np.float64_t, ndim=2] D,np.nd
                         continue
 
                     if D[i,j]>(D[i,k]+D[k,j]):
+                        if verbose>=1:
+                            print(" Changed",i,"->",j,"from ",D[i,j],"to ",D[i,k]+D[k,j])
                         D[i,j] = D[i,k]+D[k,j]
                         nxt[i,j]=nxt[i,k]
+                        
+                        
     
-    
+        if verbose>=2:
+            input("Press Enter to continue")
 
 cpdef DP(double D_shp,np.ndarray[np.float64_t, ndim=2] D,np.ndarray[long, ndim=2] nxt,int mode, int verbose=0):
     cdef int v = int(D_shp)
@@ -53,17 +57,22 @@ cdef np.ndarray[np.float64_t, ndim=2] DP_inner(int D_shp,np.ndarray[np.float64_t
     for stage in range(v-2):
         W_copy = W.copy()
         if verbose>=1:
-            print("Iteration:", stage,"\n")
-            print(W)
-            if verbose>=2:
-                input("Press Enter to continue")
+            print("\nStage:", stage,"\n",W)
+           
+
         for i in range(v):
             for j in range(v):
                 for k in range(v):
                 
                     if W_copy[i,j]>(W[i,k]+W[k,j]):
+                        if verbose>=1:
+                            print(" Changed",i,"->",j,"from ",W[i,j],"to ",W[i,k]+W[k,j])
+                     
                         W_copy[i,j] = W[i,k]+W[k,j]
                         nxt[i,j]=nxt[i,k]
+        if verbose>=2:
+                input("Press Enter to continue")
+                
         if (W_copy==W).all():
             if verbose>=1:
                 print("Breaking out, algorithm stagnant")
@@ -79,19 +88,23 @@ cdef DP_inner_naive(int D_shp,np.ndarray[np.float64_t, ndim=2] D,np.ndarray[np.f
     for stage in range(v-2):
         W_copy = W.copy()
         if verbose>=1:
-            print("Iteration:", stage,"\n")
-            print(W)
-            if verbose>=2:
-                input("Press Enter to continue")
+            print("\nStage:", stage,"\n",W)
+            
+
         for i in range(v):
             for j in range(v):
                 for k in range(v):
                 
                     if W_copy[i,j]>(W[i,k]+W[k,j]):
+                        if verbose>=1:
+                            print(" Changed",i,"->",j,"from ",W[i,j],"to ",W[i,k]+W[k,j])
+                     
                         W_copy[i,j] = W[i,k]+D[k,j]
                         nxt[i,j]=nxt[i,k]
+        if verbose>=2:
+            input("Press Enter to continue")
         if (W_copy==W).all():
-            #print(stage)
+            print("Algorithm Constant, Breaking out")
             break
         else:
             W = W_copy
