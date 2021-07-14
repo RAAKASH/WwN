@@ -20,18 +20,18 @@ cdef int floyd_warshall_inner(int D_shp,np.ndarray[np.float64_t, ndim=2] D,np.nd
         if verbose>=1:
             print("\nStage:",k,"\n",D)
             
-            for i in range(v):
-                if i==k:
+        for i in range(v):
+            if i==k:
+                continue
+            for j in range(v):
+                if j == k:
                     continue
-                for j in range(v):
-                    if j == k:
-                        continue
 
-                    if D[i,j]>(D[i,k]+D[k,j]):
-                        if verbose>=1:
-                            print(" Changed",i,"->",j,"from ",D[i,j],"to ",D[i,k]+D[k,j])
-                        D[i,j] = D[i,k]+D[k,j]
-                        nxt[i,j]=nxt[i,k]
+                if D[i,j]>(D[i,k]+D[k,j]):
+                    if verbose>=1:
+                        print(" Changed",i,"->",j,"from ",D[i,j],"to ",D[i,k]+D[k,j])
+                    D[i,j] = D[i,k]+D[k,j]
+                    nxt[i,j]=nxt[i,k]
                         
                         
     

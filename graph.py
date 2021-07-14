@@ -530,7 +530,8 @@ class graph:
             f.write(str(self.arclist[i][0].num)+" "+str(self.arclist[i][1].num)+" "+str(self.arclist[i][2])+" "+str(self.arclist[i][3])+"\n")
         f.close()
     
-        
+     
+    
     def replace_arc(self,s,e,cost,capacity=None):
         """ Replacing arc information
         
@@ -619,7 +620,7 @@ class graph:
         Can be accessed through obj.D and obj.nxt
         """
         if verbose>=1:
-            print("\n\n*******************Dynamic programming routine, mode=",mode,"************************")
+            print("\n\n**************Dynamic programming routine, mode=",mode,"************************")
         self.method="num"
         nxt = self.get_parent_mat(method=self.method)
             
@@ -867,7 +868,8 @@ if __name__ == "__main__":
    
     gr = graph()
     gr.clear()
-    gr.read_file('Data/Class_DP_ExNet.txt')
+    gr.read_file("Data/Q2data.txt")
+    #gr.read_file('Data/Class_DP_ExNet.txt')
     #gr.read_file('Data/Optimal_Loop.txt')
     #gr.read_file("Data/neg_no_cycle.txt")
     #gr.read_file("Data/neg_cycle.txt")
@@ -949,3 +951,7 @@ if __name__ == "__main__":
     print("\nCost:",gr.get_path_cost(pth))
     """
     #print(gr.arbitrage(1))
+    """
+    Check tramp steamer problem, code this shit
+    
+    """
