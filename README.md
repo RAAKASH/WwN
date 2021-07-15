@@ -3,7 +3,7 @@ Codes written for partial completion of the course Working with Networks at IIMA
 <H2> Setup information </H2>
 Enter this code in the cmd prompt in the directory in which these code files are downloaded before importing the necessary libraries.
 <br>
->><b>python setup.py build_ext --inplace </b>
+>><b> python setup.py build_ext --inplace </b>
 
 <h2> Speed Profile </h2>
 For the cython HTML generation type the below code.
