@@ -12,5 +12,5 @@ For the cython HTML generation type the below code.
  <h2>Algorithms available </h2>
  <ul style="list-style-type:disc;">
   <li>Search Algorithms: BFS, DFS</li>
-  <li>Shortest Path algorithms: (Modified) Bellman ford, Floyd Warshall, Dynamic programming</li>
+  <li>Shortest Path algorithms: (Modified) Bellman ford, Floyd Warshall, Dynamic programming, Second shortest path, arbitrage algorithm.</li>
 </ul>
