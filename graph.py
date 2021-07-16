@@ -473,6 +473,7 @@ class graph:
                 tmp = dist[fixed ==0]
                 if verbose>=2:
                     print("Iteration:",iter1)
+                    print("chosen")
                     iter1=iter1+1
                     print(dist)
                 if len(tmp)==0:
@@ -544,6 +545,16 @@ class graph:
         ind = np.where((tmp[:,0]==s) & (tmp[:,1]==e))[0][0]
         self.arclist[ind][2] = cost
         self.arclist[ind][3] = capacity
+        
+    def replace_arcs(self,arclist):
+        """ Replacing arc information
+        
+        Inputs: Tail node, Head node, cost, capacity (optional)
+        """
+        for i in arclist:
+            i[0].replacecost(i[1],i[2])
+            i[0].replacecapacity(i[1],i[3])
+        self.arclist =arclist
     
     def get_path_cost(self,path):
         for i in range(len(path)):
@@ -666,14 +677,16 @@ class graph:
         self.nxt = nxt
         self.D = D
         return(D,nxt)
-    def return_path(self,u,v):
+    def return_path(self,u,v,method=None):
         """  Floyd Warshall Algorithm - complementary\n
         Requires Floyd Warshall algorithm to be run first
         
         Input: Start nodes, End nodes \n
         Output: Returns Shortest path 
         """
-        method = self.method
+        if method==None:
+            method = self.method
+        
         if isinstance(u, int):
             u = self.node_list[u]
         if isinstance(v, int):
@@ -730,8 +743,122 @@ class graph:
         
 
     
- 
+    def Astar(self,s,e,D=np.array([0]),verbose=0):
+        
+        """
+        A* Algorithm \n
+        Input: s (Start node), e (end node), D = Distance function - (Astar, Dijkstras),verbose=0/1/2 
+        Output: Shortest path
+        """
+        if (D==0).all():
+            D=np.zeros((len(self.node_list),len(self.node_list)))
+        if isinstance(s,int):
+            s = self.node_list[s]
+        if isinstance(e,int):
+            e = self.node_list[e] 
+            
+        path = []
+        dist = np.array([np.inf]*len(self.node_list)) # distance from source node
+        dist[s.num]=0
+        tmp_nodelist = self.node_list.copy()           
+        chosen = []
+        c=s
+       
+        iter1=1
+        ind =0
+        dist1 = D[:,e.num].T # Shortest distance to end node
+        dist2 = np.array([0.0]*len(self.node_list)) # Chosen array
+        tmp_dist=np.array([0])
+        
+        while tmp_nodelist!=[] and not (tmp_dist==np.inf).all():
+            chosen.append(c)
+            tmp_nodelist.remove(c)
+            for i in c.getchild():
+                if dist[i.num]>dist[c.num] + c.getcost(i):
+                    dist[i.num] = dist[c.num] + c.getcost(i)
+                    i.temp_parent=c
+                #print(i,c.getcost(i))
+            
+            dist2[c.num] = np.inf            
+            tmp_dist = dist1+dist+dist2
 
+            #for d in chosen:
+            #    tmp_dist[d.num] = np.inf
+            
+            ind  = np.argmin(tmp_dist) 
+            #self.node_list[ind].temp_parent= c
+            c = self.node_list[ind]    
+                
+            if verbose>=1:
+                print("\nIteration:",iter1)
+                iter1=iter1+1
+                print("Nodes fixed:",chosen)
+                print("Distances fixed:",dist+dist1)
+                print("Distances fixed:",tmp_dist)
+            
+              
+            if chosen[-1]==e:
+                break
+                
+            
+             
+        if dist[e.num]!=np.inf:
+            if verbose>=1:
+                print("\nPath found")
+            prt = e
+            while 1:
+                
+                if prt==s:
+                    path = [prt]+path
+                    break
+                else:
+                    #print(path)
+                    path =[prt]+path
+                    prt = prt.temp_parent
+                
+        self.dist = dist
+        self.path = path
+        return (path,dist)
+ 
+    def binarysearch(self,func,max_val=100,min_val=0,tol=10**-3,verbose=0):
+        if verbose>=1:
+            print("\n************ Binary Search ****************")
+            print("Max value:",max_val,", Min value:",min_val,"\n")
+        while  abs(max_val-min_val)>tol:
+            cur_pt = (max_val+min_val)/2
+            if verbose>=1:
+                print("Evaluating Point:",cur_pt)
+            if func(cur_pt)>0:
+                min_val = cur_pt
+                cur_pt = (cur_pt+max_val)/2
+            else:
+                max_val = cur_pt
+                cur_pt = (cur_pt+min_val)/2
+        return max_val
+    
+    def optimal_loop(self,g):
+        """ Function used for finding the optimal loop basis benefit vs cost
+        
+        Benefit in 3rd column, cost in 4th column \n
+        Use the function obj.binarysearch(obj.optimal_loop,max_val,min_val)
+        """
+        tmp1 = np.array(self.arclist)
+        tmp = tmp1.copy()
+        tmp[:,2] =-tmp1[:,2]+g*tmp1[:,3]
+        self.replace_arcs(tmp)
+        """
+        g2 = graph()
+        g2.create_nodes(len(self.node_list))
+        g2.add_arcs(tmp,"node")
+        """
+        self.floyd_warshall_cyth()
+        flag = (np.diag(self.D)<0).any()
+        self.replace_arcs(tmp1)
+        if flag:
+            return 1
+        else:
+            return -1
+        
 class node:
     i = 0
 
@@ -779,12 +906,14 @@ class node:
                         l.__capacity.append(capacity[parent.index(l)])
                         l.__child.append(self)
 
-    def getcost(self, d):
+    def getcost(self, d=None):
         """ Getting Cost of arc
         
         Inputs: Head of arc \n
         Output: Cost
         """
+        if d==None:
+            return(self.__cost)
         if d in self.__child:
             return self.__cost[self.__child.index(d)]
         else:
@@ -796,12 +925,14 @@ class node:
     def replacecapacity(self,d,capacity):
         self.__capacity[self.__child.index(d)] = capacity
 
-    def getcapacity(self, d):
+    def getcapacity(self, d=None):
         """ Getting Capacity of arc
         
         Inputs: Head of arc \n
         Output: Capacity
         """
+        if d==None:
+            return self.__capacity
         if d in self.__child:
             return self.__capacity[self.__child.index(d)]
         else:
@@ -869,6 +1000,38 @@ if __name__ == "__main__":
     gr = graph()
     gr.clear()
     gr.read_file("Data/Q2data.txt")
+    #gr.read_file("Data/Optimal_Loop.txt")
+    #gr.create_randgraph(100,0.1)
+    gr.floyd_warshall_cyth()
+    tmp_adj = gr.D#+np.around((np.random.rand(1000,1000)-0.5)*0.2,2);
+    #tmp_adj[:,:]=0
+    np.fill_diagonal(tmp_adj,0)
+    #gr.Astar(0,7,tmp_adj,verbose=0)
+    def f(g=10):
+        if g>0.1823:
+            return -1
+        else:
+            return 1
+    #print("\n",gr.binarysearch(f,tol=10**-6))
+    """
+    def f(g=10,gr=gr,size=len(gr.node_list)):
+        tmp = np.array(gr.arclist)
+        
+        tmp[:,2] =-tmp[:,2]+g*tmp[:,3]
+        g2 = graph()
+        g2.create_nodes(size)
+        g2.add_arcs(tmp,"node")
+        g2.floyd_warshall_cyth()
+        #print(np.diag(g2.D))
+        if (np.diag(g2.D)<0).any():
+            return 1
+        else:
+            return -1
+    """
+    
+    #print(f())
+    print("\n",gr.binarysearch(gr.optimal_loop,max_val=1000,min_val=0,tol=10**-3,verbose=1))
+    #gr.Astar(0,3,(gr.D),verbose=2)
     #gr.read_file('Data/Class_DP_ExNet.txt')
     #gr.read_file('Data/Optimal_Loop.txt')
     #gr.read_file("Data/neg_no_cycle.txt")
@@ -891,6 +1054,7 @@ if __name__ == "__main__":
     t3 = timecalc(gr.return_path)
     t4 = timecalc(gr.dijkstra)
     t5 = timecalc(gr.DP_cyth)
+    t6 = timecalc(gr.Astar)
     #t()
     #"""
     #gr.create_randgraph(500,0.01)
