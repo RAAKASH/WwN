@@ -17,3 +17,10 @@ For the cython HTML generation type the below code.
   <li> Miscellaneous: Optimal Loop, Binary search
  
 </ul>
+
+<h2> Upcoming algorithms </h2>
+
+<ul style="list-style-type:disc;">
+  <li>Maximum Capacity</li>
+
+</ul>
