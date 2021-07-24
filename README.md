@@ -15,12 +15,12 @@ For the cython HTML generation type the below code.
   <li>Shortest Path algorithms: (Modified) Bellman ford, Floyd Warshall, Dynamic programming, Second shortest path, arbitrage algorithm.</li>
   <li> Heuristics algoithm: A* (Dijkstras).
   <li> Miscellaneous: Optimal Loop, Binary search
-  <li> Maximum Flow: Ford Fulkerson
+  <li> Maximum Flow: Ford Fulkerson (Edmonds Karp Implementation)
 </ul>
 
 <h2> Upcoming algorithms </h2>
 
 <ul style="list-style-type:disc;">
-  <li>Edmonds Karp</li>
+  <li>Push Relabel</li>
 
 </ul>
