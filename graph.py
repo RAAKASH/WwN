@@ -1,6 +1,7 @@
 import numpy as np
 import networkx as nx
 from tqdm import tqdm
+import re
 #from pyvis.network import Network
 import matplotlib.pyplot as plt
 from timeit import default_timer as timer
@@ -33,17 +34,23 @@ class graph:
             file1.seek(0)
             a = file1.readlines()
             a[0] = a[0].replace("\n", "")
-            a[0] = a[0].split(" ")
-            a[0] = list(map(int, a[0]))
+            a[0] = a[0].split()
+            if len(a[0])>2:
+                 a[0] = [int(a[0][0]),int(a[0][1]),float(a[0][2]),float(a[0][3])]
 
+            else:
+                a[0] = list(map(int, a[0]))
+          
             for i in range(1,len(a)):
                 a[i] = a[i].replace("\n", "")
-                a[i] = a[i].split(" ")
+                a[i] = a[i].split()
                 #a[i] = list(map(float, a[i]))
                 a[i] = [int(a[i][0]),int(a[i][1]),float(a[i][2]),float(a[i][3])]
 
                 #a[i] = [int(a[i][0]),int(a[i][1]),np.float(a[i][2]),np.float(a[i][3])]
-
+            if len(a[0])>2:
+                #print(a[-1][0])
+                a = [[a[-1][0]+1]]+a
             self.add_arcs(a)
             return a
         else:
@@ -54,15 +61,14 @@ class graph:
                 a.addchild(n[a])
         else:
             if method=="num":
-                for i in tqdm(range(len(n)),desc="Loading File:"+self.temp_read_file_name):
-                    if i == 0:
-                        self.create_nodes(n[i][0])
-                    else:
-                        self.addarc(n[i])
+                self.create_nodes(n[0][0])
+                #print(n[0])   
+                for i in tqdm(range(1,len(n)),desc="Loading File:"+self.temp_read_file_name):
+                    self.addarc(n[i])
             else:
                 for i in tqdm(n,desc="Loading Arcs:"):
-                    
-                   self.addarc(i,method)
+                    #print(i)
+                    self.addarc(i,method)
                 
         self.getarclist()
         self.getgraph()
@@ -165,7 +171,7 @@ class graph:
         self.getarclist()
         return self.getgraph()
 
-    def draw(self,size = 12, d=None):
+    def plot(self,size = 12, d=None):
         """ Graph plotting
         
         Input: size of plot, dictionary based graph (optional) \n
@@ -262,10 +268,10 @@ class graph:
                     print(self.dfs_algo( path, i, e))
 
     
-    def search(self,s,e=None,method = "bfs",verbose=0):
+    def search(self,s,e=None,method = "bfs",verbose=0,capacity=0):
         """
         DFS and BFS algorithm \n
-        Inputs: input, output(optional), method = "bfs"/"dfs", verbose = 0,1,2 \n
+        Inputs: input, output(optional), method = "bfs"/"dfs", verbose = 0,1,2; capacity=0/1 (0 if capacity not to be considered) \n
         Output: (Path, visited and unseen)
         """
         
@@ -314,7 +320,11 @@ class graph:
                     
             
             #tmp = [a for a in s.getchild() if a not in visited and a not in active]
-            tmp = [a for a in s.getchild() if vis_act[a.num]==0]
+           
+            if capacity==1:        
+                tmp = [a for a in s.getchild() if vis_act[a.num]==0 and s.getcapacity(a)!=0]
+            else:
+                tmp = [a for a in s.getchild() if vis_act[a.num]==0]
             #tmp   = list(set(s.getchild()) - set(visited)-set(active)) # Same as checking child in unseen but faster
             
             # Adding temp parent for path tracing
@@ -509,7 +519,10 @@ class graph:
         return (path,dist)
     
     def arbitrage(self,arbitrage_node=0,verbose=0):
+        """ Arbitrage algorithm - Uses bellman ford
         
+        Input: Arbitrage node, verbose
+        """
         gr = self.copy()
         if isinstance(arbitrage_node, int): 
             arbitrage_node  = gr.node_list[arbitrage_node]
@@ -821,6 +834,11 @@ class graph:
         return (path,dist)
  
     def binarysearch(self,func,max_val=100,min_val=0,tol=10**-3,verbose=0):
+        """ Binary Search \n
+        Input : Function to evaluate, max_val, min_val, tol
+        
+        
+        """
         if verbose>=1:
             print("\n************ Binary Search ****************")
             print("Max value:",max_val,", Min value:",min_val,"\n")
@@ -858,6 +876,47 @@ class graph:
             return 1
         else:
             return -1
+        
+        
+    def create_residual_network(self):
+        
+        gr1 = self.copy()
+        for i in gr1.arclist:
+            if i[0] in i[1].getchild():
+                pass
+            else:
+                gr1.addarc([i[1],i[0],0,0],method="node")
+        gr1.getarclist()
+        return gr1
+        
+    def ford_fulkerson(self,s,t):
+
+            
+        gr = self.create_residual_network();
+        flow_val = 0
+        if isinstance(s,int):
+           s = gr.node_list[s]
+        if isinstance(t,int):
+           t = gr.node_list[t]        
+        
+        path = gr.search(s,t,capacity=1)[0]
+        gr.flow_var=[]
+        #print(path)
+        while path!=[]:
+            mincap = np.inf
+            for i in range(len(path)-1):
+                mincap =min(mincap,path[i].getcapacity(path[i+1]))
+            gr.flow_var += [path,mincap]
+
+            flow_val+=mincap
+            for i in range(len(path)-1):
+                gr.replace_arc(path[i],path[i+1],path[i].getcost(path[i+1]),path[i].getcapacity(path[i+1])-mincap) 
+                gr.replace_arc(path[i+1],path[i],path[i+1].getcost(path[i]),path[i+1].getcapacity(path[i])+mincap)
+            
+            path = gr.search(s,t,capacity=1)[0]
+        return (gr,flow_val)
+        
+        
         
 class node:
     i = 0
@@ -999,13 +1058,20 @@ if __name__ == "__main__":
    
     gr = graph()
     gr.clear()
-    gr.read_file("Data/Q2data.txt")
+    gr.read_file('Data/Class_DP_ExNet.txt')
+    gr1=gr.ford_fulkerson(0,7)
+    
+    gr.clear()
+    
+    #gr.read_file("Data/Q2data.txt")
     #gr.read_file("Data/Optimal_Loop.txt")
     #gr.create_randgraph(100,0.1)
-    gr.floyd_warshall_cyth()
-    tmp_adj = gr.D#+np.around((np.random.rand(1000,1000)-0.5)*0.2,2);
+    #gr.read_file("Data/OldenburgEdges_Pro.txt",overwrite=1)
+    
+    #gr.floyd_warshall_cyth()
+    #tmp_adj = gr.D#+np.around((np.random.rand(1000,1000)-0.5)*0.2,2);
     #tmp_adj[:,:]=0
-    np.fill_diagonal(tmp_adj,0)
+    #np.fill_diagonal(tmp_adj,0)
     #gr.Astar(0,7,tmp_adj,verbose=0)
     def f(g=10):
         if g>0.1823:
@@ -1030,7 +1096,7 @@ if __name__ == "__main__":
     """
     
     #print(f())
-    print("\n",gr.binarysearch(gr.optimal_loop,max_val=1000,min_val=0,tol=10**-3,verbose=1))
+    #print("\n",gr.binarysearch(gr.optimal_loop,max_val=1000,min_val=0,tol=10**-3,verbose=1))
     #gr.Astar(0,3,(gr.D),verbose=2)
     #gr.read_file('Data/Class_DP_ExNet.txt')
     #gr.read_file('Data/Optimal_Loop.txt')
