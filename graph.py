@@ -171,7 +171,7 @@ class graph:
         self.getarclist()
         return self.getgraph()
 
-    def plot(self,size = 12, d=None):
+    def plot(self,size = 12, d=None,weight="cost"):
         """ Graph plotting
         
         Input: size of plot, dictionary based graph (optional) \n
@@ -183,10 +183,14 @@ class graph:
 
         g = nx.DiGraph()
         g.add_nodes_from(d.keys())
-        for k, v in d.items():
-            #g.add_edges_from(([(k, t) for t in v]))
-            g.add_weighted_edges_from(([(k, t,k.getcost(t)) for t in v]))
-        
+        if weight=="cost":
+            for k, v in d.items():
+                #g.add_edges_from(([(k, t) for t in v]))
+                g.add_weighted_edges_from(([(k, t,k.getcost(t)) for t in v]))
+        else:
+            for k, v in d.items():
+                #g.add_edges_from(([(k, t) for t in v]))
+                g.add_weighted_edges_from(([(k, t,k.getcapacity(t)) for t in v]))
         plt.figure(figsize=(size,size))
         
         try:
@@ -457,9 +461,10 @@ class graph:
                     prt = prt.temp_parent
     
                     
-    def dijkstra(self,s,e,verbose=0):
+    def dijkstra(self,s,e=None,verbose=0):
         """
         Output: Path and distance
+        Use obj.path, obj.dist for accessing path and distance
         """
         if isinstance(s,int):
             s = self.node_list[s]
@@ -473,47 +478,51 @@ class graph:
         fixed[s.num]=1
         chosen = [s]
         iter1=1
-        while fixed[e.num]==0:
+        while 1:
             for c in chosen:
                 for j in c.getchild():
-                    if dist[j.num]>dist[c.num]+c.getcost(j):
+                   if dist[j.num]>dist[c.num]+c.getcost(j):
                         dist[j.num]=dist[c.num]+c.getcost(j)
                         j.temp_parent = c
 
-                tmp = dist[fixed ==0]
                 if verbose>=2:
                     print("Iteration:",iter1)
                     print("chosen")
                     iter1=iter1+1
-                    print(dist)
-                if len(tmp)==0:
-                    path = []
-                    break
-                else:
+                    print(fixed,c)
+            tmp = dist[fixed ==0]
+            
+            if len(tmp)==0:
+                path = []
+                break
+            else:
 
-                    k = min(tmp)
-                    #print(k)
-                    k = np.where(dist==k)
-                    k = k[0]
-                    chosen = []
-                    for l in k:
-                        fixed[l]=1
-                        chosen.append( self.node_list[l])
-                 
-        if dist[e.num]!=np.inf:
-            if verbose>=1:
-                print("\nPath found")
-            prt = e
-            while 1:
-                
-                if prt==s:
-                    path = [prt]+path
-                    break
-                else:
-                    #print(prt.num)
-                    path =[prt]+path
-                    prt = prt.temp_parent
-                
+                k = min(tmp)
+                #print(k)
+                k = np.where(dist==k)
+                k = k[0]
+                chosen = []
+                for l in k:
+                    fixed[l]=1
+                    chosen.append( self.node_list[l])
+                    
+            
+        if e!=None:         
+            if dist[e.num]!=np.inf:
+                if verbose>=1:
+                    print("\nPath found")
+                prt = e
+                while 1:
+                    
+                    if prt==s:
+                        path = [prt]+path
+                        break
+                    else:
+                        #print(prt.num)
+                        path =[prt]+path
+                        prt = prt.temp_parent
+        else:
+            path=[]
         self.dist = dist
         self.path = path
         return (path,dist)
@@ -538,6 +547,11 @@ class graph:
         return(pth,gr.get_path_cost(pth) )
         
     def writegraph(self,name="demofile.txt"):
+        """
+        Input=Name of file
+        
+        """
+        
         f = open(name, "w+")
         f.write(str(len(self.node_list))+" " + str(len(self.arclist))+"\n")
         for i in tqdm(range(len(self.arclist))):
@@ -552,12 +566,14 @@ class graph:
         Inputs: Tail node, Head node, cost, capacity (optional)
         """
         s.replacecost(e,cost)
-        if capacity!=None:
-            s.replacecapacity(e,capacity)
         tmp = np.array(self.arclist)
         ind = np.where((tmp[:,0]==s) & (tmp[:,1]==e))[0][0]
+        
+        if capacity!=None:
+            s.replacecapacity(e,capacity)
+            self.arclist[ind][3] = capacity
         self.arclist[ind][2] = cost
-        self.arclist[ind][3] = capacity
+       
         
     def replace_arcs(self,arclist):
         """ Replacing arc information
@@ -890,7 +906,11 @@ class graph:
         return gr1
         
     def ford_fulkerson(self,s,t):
-
+        """ Ford fulkerson using bfs
+        
+        Output: 1) Residual graph: paths which can be accessed through obj.flow_var
+                2) Total flow
+        """
             
         gr = self.create_residual_network();
         flow_val = 0
@@ -901,7 +921,6 @@ class graph:
         
         path = gr.search(s,t,capacity=1)[0]
         gr.flow_var=[]
-        #print(path)
         while path!=[]:
             mincap = np.inf
             for i in range(len(path)-1):
@@ -916,7 +935,20 @@ class graph:
             path = gr.search(s,t,capacity=1)[0]
         return (gr,flow_val)
         
+    def set_distance_lables(self,t):
+        """
+            Creates new graph along with distance labels
+        """
+        gr = graph()
+        gr.create_nodes(len(self.node_list))
+        for i in self.arclist:
+            gr.addarc([i[1].num,i[0].num,i[2],i[3]])
         
+        gr.getarclist()
+        gr.dijkstra(t)
+        return(gr)
+        
+    def push(self,active):
         
 class node:
     i = 0
@@ -1058,11 +1090,12 @@ if __name__ == "__main__":
    
     gr = graph()
     gr.clear()
-    gr.read_file('Data/Class_DP_ExNet.txt')
-    gr1=gr.ford_fulkerson(0,7)
+    #gr.read_file('Data/Class_DP_ExNet.txt')
+    gr.read_file("Data/Edmonds_Karp_weak.txt")
+    gr1=gr.ford_fulkerson(0,9)
     
-    gr.clear()
-    
+    gr.plot(weight="capacity")
+    #gr.writegraph(name="Data/ford_fulk_weak.txt")
     #gr.read_file("Data/Q2data.txt")
     #gr.read_file("Data/Optimal_Loop.txt")
     #gr.create_randgraph(100,0.1)
@@ -1073,6 +1106,26 @@ if __name__ == "__main__":
     #tmp_adj[:,:]=0
     #np.fill_diagonal(tmp_adj,0)
     #gr.Astar(0,7,tmp_adj,verbose=0)
+    
+    """
+    gr.create_nodes(10)
+    gr.addarc([0,1,1,1000])
+    gr.addarc([1,2,1,1000/6])
+    gr.addarc([1,3,1,1000/6])
+    gr.addarc([1,4,1,1000/6])
+    gr.addarc([1,5,1,1000/6])
+    gr.addarc([1,6,1,1000/6])
+    gr.addarc([1,7,1,1000/6])
+    gr.addarc([2,8,1,1000/6])
+    gr.addarc([3,8,1,1000/6])
+    gr.addarc([4,8,1,1000/6])
+    gr.addarc([5,8,1,1000/6])
+    gr.addarc([6,8,1,1000/6])
+    gr.addarc([7,8,1,1000/6])
+    gr.addarc([8,9,1,1000])
+    gr.getarclist()
+    """
+    
     def f(g=10):
         if g>0.1823:
             return -1
