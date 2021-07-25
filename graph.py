@@ -174,7 +174,7 @@ class graph:
     def plot(self,size = 12, d=None,weight="cost"):
         """ Graph plotting
         
-        Input: size of plot, dictionary based graph (optional) \n
+        Input: size of plot, dictionary based graph (optional), weight = "cost","capacity",or anything else \n
         Output: Planar/spring plot basis planarity condition
         """
         print("\n ********** In plotting function *********")
@@ -191,18 +191,35 @@ class graph:
             for k, v in d.items():
                 #g.add_edges_from(([(k, t) for t in v]))
                 g.add_weighted_edges_from(([(k, t,k.getcapacity(t)) for t in v]))
-        plt.figure(figsize=(size,size))
         
+            
+        plt.figure(figsize=(size,size))
+        labels ={}
+        if weight=="cost":
+            for k, v in d.items():
+                for t in v:
+                    labels[(k, t)] =round(k.getcost(t),2)
+            
+                
+        elif weight=="capacity":
+            for k, v in d.items():
+                for t in v:
+                    labels[(k, t)] =round(k.getcapacity(t),2) 
+        else:
+           
+            for k, v in d.items():
+                for t in v:
+                    labels[(k, t)] = str(round(k.getcost(t),2)) + "/"+ str(round(k.getcapacity(t),2)) 
+            
         try:
             pos=nx.planar_layout(g) 
             nx.draw_networkx(g,pos)
-            labels = nx.get_edge_attributes(g,'weight')
+
             nx.draw_networkx_edge_labels(g,pos,edge_labels=labels)
         except:
             print("Graph not planar changing to spring type")
             pos=nx.spring_layout(g) 
             nx.draw_networkx(g,pos)
-            labels = nx.get_edge_attributes(g,'weight')
             nx.draw_networkx_edge_labels(g,pos,edge_labels=labels)
         plt.show()
 
@@ -893,6 +910,15 @@ class graph:
         else:
             return -1
         
+    
+    def capacity_compare(self,gr):
+        flow = []
+        for i in self.arclist:
+            cap =  i[3]- gr.node_list[i[0].num].getcapacity(gr.node_list[i[1].num])
+            if cap>0:
+                flow.append([i[0],i[1],cap])
+        return flow
+                
         
     def create_residual_network(self):
         
@@ -901,17 +927,20 @@ class graph:
             if i[0] in i[1].getchild():
                 pass
             else:
-                gr1.addarc([i[1],i[0],0,0],method="node")
+                gr1.addarc([i[1],i[0],1,0],method="node")
         gr1.getarclist()
         return gr1
         
-    def ford_fulkerson(self,s,t):
-        """ Ford fulkerson using bfs
+    def ford_fulkerson(self,s,t,verbose=0):
+        """ Ford fulkerson/Edmonds Karp implementation using bfs
         
         Output: 1) Residual graph: paths which can be accessed through obj.flow_var
                 2) Total flow
+                3) Flow for all arcs - Access through obj.flow
         """
-            
+        if verbose>=1:
+            print("\n********Ford-Fulkerson***********")
+            print("Returns residual graph, use obj.flow_var for different paths, obj.flow_val for maximum flow value, obj.flow for flows across different arcs \n\n")
         gr = self.create_residual_network();
         flow_val = 0
         if isinstance(s,int):
@@ -920,12 +949,15 @@ class graph:
            t = gr.node_list[t]        
         
         path = gr.search(s,t,capacity=1)[0]
-        gr.flow_var=[]
+        self.flow_var=[]
         while path!=[]:
             mincap = np.inf
             for i in range(len(path)-1):
                 mincap =min(mincap,path[i].getcapacity(path[i+1]))
-            gr.flow_var += [path,mincap]
+            
+            if verbose>=1:
+                print("Path found",path,"Minimum cap:",mincap)
+            self.flow_var += [path,mincap]
 
             flow_val+=mincap
             for i in range(len(path)-1):
@@ -933,22 +965,115 @@ class graph:
                 gr.replace_arc(path[i+1],path[i],path[i+1].getcost(path[i]),path[i+1].getcapacity(path[i])+mincap)
             
             path = gr.search(s,t,capacity=1)[0]
-        return (gr,flow_val)
+            self.flow = self.capacity_compare(gr)
+            self.flow_val = flow_val
+        return (gr,flow_val,self.flow)
         
-    def set_distance_lables(self,t):
+    def set_distance_lables(self,t,gr=None):
         """
             Creates new graph along with distance labels
         """
-        gr = graph()
-        gr.create_nodes(len(self.node_list))
-        for i in self.arclist:
-            gr.addarc([i[1].num,i[0].num,i[2],i[3]])
-        
-        gr.getarclist()
+        if gr==None:
+            gr = graph()
+            gr.create_nodes(len(self.node_list))
+            for i in self.arclist:
+                gr.addarc([i[1].num,i[0].num,i[2],i[3]])
+            gr.getarclist()
+           
+            
         gr.dijkstra(t)
         return(gr)
         
-    def push(self,active):
+    def push(self,active,s,t,verbose=0):
+        flag=0
+        for v in active:
+            for j in v.getchild():
+                if self.dist[j.num]<self.dist[v.num] and v.getcapacity(j)>0:
+                    f = min(v.excess,v.getcapacity(j))
+                    flag=1
+                    v.excess -=f
+                    j.excess +=f
+                    
+                    if verbose>=1:
+                        print("Pushing volume ",f,"from ",v,"to ",j)
+                        if verbose>=2:
+                            print("Left over excess at ",v," is ","{:.4e}".format(v.excess))
+                    if j !=s and j!=t:
+                        if j not in active:
+                            active.append(j)
+                        
+                    self.replace_arc(v,j,v.getcost(j),v.getcapacity(j)-f)
+                    self.replace_arc(j,v,j.getcost(v),j.getcapacity(v)+f)
+                    
+                  
+            if abs(v.excess - 0)<10**-9:
+                if verbose>=2:
+                    #print(active)
+                    print("Removing ",v," from active list")
+                active.remove(v)
+            #print("Flag:",flag)
+            return flag
+        
+            
+            
+    def relabel(self,active,verbose=0):
+        min_val=np.inf
+        
+        for j in active:
+            if min_val>self.dist[j.num]:
+                v=j
+        
+        w = min([self.dist[j.num] for j in v.getchild() if v.getcapacity(j)>0] )   
+        if verbose>=1:
+            print("Relabelling ",v," distance to ",w+1)
+        self.dist[v.num] = w+1
+        
+        
+    def push_relabel(self,s,t,verbose=0):
+        """
+        Input: Start node, end node
+        
+        Output: Residual network graph, maxflow value
+        obj.flow can be used for getting flow through each arc
+        
+        """
+        if verbose>=1:
+            print("\n***********Push Relabel algo running**************")
+        gr1 = self.create_residual_network()
+        gr_tmp  = self.set_distance_lables(t)
+        gr1.dist = gr_tmp.dist
+        if isinstance(s, int):
+            s = gr1.node_list[s]
+        if isinstance(t, int):
+            t = gr1.node_list[t]
+        #dist = gr1.dijkstra(t)[1]
+        
+        
+        if gr1.dist[s.num]==np.inf:
+            print("No path between start and end nodes")
+            return 0
+        gr1.dist[s.num] =  sum(np.array(gr1.dist)<np.inf)
+        active =[]
+        for i in gr1.node_list:
+            i.excess = 0
+        
+        # Preflow
+        for j in s.getchild():
+
+            active.append(j)
+            j.excess = s.getcapacity(j)
+            gr1.replace_arc(s,j,s.getcost(j),0)
+            gr1.replace_arc(j,s,j.getcost(s),j.excess)
+            if verbose>=1:
+                print("Pushing volume ",j.excess,"from ",s,"to ",j)
+        
+        while active!=[]:
+            if gr1.push(active,s,t,verbose) == 0:
+                gr1.relabel(active,verbose=verbose)
+            #print(active,gr1.dist)
+            
+        self.flow = self.capacity_compare(gr1)   
+        return gr1,t.excess
         
 class node:
     i = 0
@@ -1092,9 +1217,12 @@ if __name__ == "__main__":
     gr.clear()
     #gr.read_file('Data/Class_DP_ExNet.txt')
     gr.read_file("Data/Edmonds_Karp_weak.txt")
+    #gr.read_file("Data/ford_fulk_weak.txt")
     gr1=gr.ford_fulkerson(0,9)
     
     gr.plot(weight="capacity")
+    gr2 = gr.push_relabel(0,9)[0]
+    #gr.plot(weight=1)
     #gr.writegraph(name="Data/ford_fulk_weak.txt")
     #gr.read_file("Data/Q2data.txt")
     #gr.read_file("Data/Optimal_Loop.txt")
