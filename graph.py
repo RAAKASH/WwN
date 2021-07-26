@@ -977,7 +977,7 @@ class graph:
             gr = graph()
             gr.create_nodes(len(self.node_list))
             for i in self.arclist:
-                gr.addarc([i[1].num,i[0].num,i[2],i[3]])
+                gr.addarc([i[1].num,i[0].num,1,i[3]])
             gr.getarclist()
            
             
@@ -986,18 +986,24 @@ class graph:
         
     def push(self,active,s,t,verbose=0):
         flag=0
+        print(active)
         for v in active:
+
             for j in v.getchild():
                 if self.dist[j.num]<self.dist[v.num] and v.getcapacity(j)>0:
+                    
                     f = min(v.excess,v.getcapacity(j))
                     flag=1
                     v.excess -=f
                     j.excess +=f
                     
                     if verbose>=1:
-                        print("Pushing volume ",f,"from ",v,"to ",j)
+                        print("\nPushing volume ",round(f,2),"from ",v,"to ",j)
                         if verbose>=2:
-                            print("Left over excess at ",v," is ","{:.4e}".format(v.excess))
+                            #print(v.getcapacity(j))
+                            #print("Left over excess at ",v," is ","{:.4e}".format(v.excess))
+                            print("Left over excess at ",v," is ",round(v.excess,2))
+                    
                     if j !=s and j!=t:
                         if j not in active:
                             active.append(j)
@@ -1006,13 +1012,13 @@ class graph:
                     self.replace_arc(j,v,j.getcost(v),j.getcapacity(v)+f)
                     
                   
-            if abs(v.excess - 0)<10**-9:
-                if verbose>=2:
-                    #print(active)
-                    print("Removing ",v," from active list")
-                active.remove(v)
-            #print("Flag:",flag)
-            return flag
+                if v.excess ==0:
+                    if verbose>=2:
+                        print("Removing ",v," from active list")
+                    active.remove(v)
+                    break
+            
+        return flag
         
             
             
@@ -1020,12 +1026,15 @@ class graph:
         min_val=np.inf
         
         for j in active:
+            #print(j)
             if min_val>self.dist[j.num]:
                 v=j
         
         w = min([self.dist[j.num] for j in v.getchild() if v.getcapacity(j)>0] )   
         if verbose>=1:
-            print("Relabelling ",v," distance to ",w+1)
+            
+            print("\nRelabelling ",v," distance to ",w+1)
+            #print(v.getchild(),v.excess)
         self.dist[v.num] = w+1
         
         
@@ -1058,21 +1067,26 @@ class graph:
             i.excess = 0
         
         # Preflow
+        if verbose>=1:
+            print("\n*****Initial flow*****")
         for j in s.getchild():
-
-            active.append(j)
+            if j!=t:
+                active.append(j)
             j.excess = s.getcapacity(j)
             gr1.replace_arc(s,j,s.getcost(j),0)
             gr1.replace_arc(j,s,j.getcost(s),j.excess)
             if verbose>=1:
+                
                 print("Pushing volume ",j.excess,"from ",s,"to ",j)
-        
+        if verbose>=1:
+            print("\n*******Iteration starts******")
         while active!=[]:
             if gr1.push(active,s,t,verbose) == 0:
                 gr1.relabel(active,verbose=verbose)
             #print(active,gr1.dist)
             
         self.flow = self.capacity_compare(gr1)   
+        self.flow_val = t.excess
         return gr1,t.excess
         
 class node:
@@ -1218,10 +1232,10 @@ if __name__ == "__main__":
     #gr.read_file('Data/Class_DP_ExNet.txt')
     gr.read_file("Data/Edmonds_Karp_weak.txt")
     #gr.read_file("Data/ford_fulk_weak.txt")
+    #gr.read_file("Data/Optimal_Loop.txt")
     gr1=gr.ford_fulkerson(0,9)
     
-    gr.plot(weight="capacity")
-    gr2 = gr.push_relabel(0,9)[0]
+    gr2 = gr.push_relabel(0,9,verbose=2)[0]
     #gr.plot(weight=1)
     #gr.writegraph(name="Data/ford_fulk_weak.txt")
     #gr.read_file("Data/Q2data.txt")
