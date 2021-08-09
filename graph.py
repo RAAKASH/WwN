@@ -1,6 +1,8 @@
 import numpy as np
 import networkx as nx
 from tqdm import tqdm
+import xlwt
+from xlwt import Workbook
 import re
 #from pyvis.network import Network
 import matplotlib.pyplot as plt
@@ -26,7 +28,7 @@ class graph:
         return tmp
 
     def read_file(self,name,overwrite=0):
-        
+        n = len(self.node_list)
         if self.temp_read_file_name!=name or overwrite==1:
             #print("Reading file:",name)
             self.temp_read_file_name = name
@@ -36,7 +38,7 @@ class graph:
             a[0] = a[0].replace("\n", "")
             a[0] = a[0].split()
             if len(a[0])>2:
-                 a[0] = [int(a[0][0]),int(a[0][1]),float(a[0][2]),float(a[0][3])]
+                 a[0] = [int(a[0][0])+n,int(a[0][1])+n,float(a[0][2]),float(a[0][3])]
 
             else:
                 a[0] = list(map(int, a[0]))
@@ -45,7 +47,7 @@ class graph:
                 a[i] = a[i].replace("\n", "")
                 a[i] = a[i].split()
                 #a[i] = list(map(float, a[i]))
-                a[i] = [int(a[i][0]),int(a[i][1]),float(a[i][2]),float(a[i][3])]
+                a[i] = [int(a[i][0])+n,int(a[i][1])+n,float(a[i][2]),float(a[i][3])]
 
                 #a[i] = [int(a[i][0]),int(a[i][1]),np.float(a[i][2]),np.float(a[i][3])]
             if len(a[0])>2:
@@ -385,6 +387,7 @@ class graph:
         
         for i in self.node_list:
             i.dist = np.inf
+            i.temp_parent = None
         s.dist = 0
         change = True
         self.getarclist()
@@ -401,9 +404,14 @@ class graph:
                 print("\n"+"Iteration:"+str(iter1+1))
                 for i in self.node_list:
                     print(i.dist,end=" ")
+                print("")
+                for i in self.node_list:
+                    print(i.temp_parent,end=" ")
             iter1=iter1+1;
-            if iter1>= len(self.node_list)+1:
+            if iter1>= len(self.node_list)*2+1:
+                print("")
                 print("Negative loop found",e.dist)
+                
                 break
         if e.dist==np.inf:
             return []
@@ -415,7 +423,7 @@ class graph:
             if verbose>=1:
                 print("\nPath found")
             prt = e
-            tmp = len(self.node_list)
+            tmp = len(self.node_list)*2
             while 1:
                 if prt==s:
                     print([prt]+path)
@@ -427,8 +435,10 @@ class graph:
                 if iter1>tmp:
                     print("Negative Loop in path finding")
                     return []
-    def bell_ford(self,s,e,verbose=0):
+    def bell_ford(self,s,e,verbose=1):
         """
+        Input: s, e 
+        Output: Returns shortest path
         refer to self.distmat and self.dist
         """
         if verbose>=1:
@@ -440,7 +450,9 @@ class graph:
             s = self.node_list[s]
         if isinstance(e,int):
             e = self.node_list[e] 
-            
+        
+        for i in self.node_list:
+            i.temp_parent=None
         dist[s.num]=0
         change = True
         self.getarclist()
@@ -450,25 +462,31 @@ class graph:
             change = False
             dist_copy = dist.copy()
             for i in self.arclist:
-                if(dist[i[1].num] >dist[i[0].num]+i[0].getcost(i[1])):
-                    dist_copy[i[1].num] = dist[i[0].num]+i[0].getcost(i[1])
-                    i[1].temp_parent = i[0]
-                    change=True
+                #Added additional capacity constraint to prevent 0 capacity arcs
+                if i[0].getcapacity(i[1])>0:
+                    if(dist[i[1].num] >dist[i[0].num]+i[0].getcost(i[1])):
+                        dist_copy[i[1].num] = dist[i[0].num]+i[0].getcost(i[1])
+                        i[1].temp_parent = i[0]
+                        change=True
                 distmat.append(dist_copy)
             
             dist = dist_copy
             if verbose>=2:
                 print("\n"+"Iteration:"+str(iter1+1))
                 print(dist_copy)
+                for i in self.node_list:
+                    print(i.temp_parent,end=" ")
             iter1=iter1+1;
-            
+            if iter1>=len(self.node_list)*2:
+                break
         self.dist = dist
         self.distmat=distmat            
         if dist[e.num]==np.inf:
             print("path not found")
         else:
             path = []
-            print("\nPath found")
+            if verbose>=1:
+                print("\nPath found")
             prt = e
             while 1:
                 if prt==s:
@@ -928,6 +946,8 @@ class graph:
                 pass
             else:
                 gr1.addarc([i[1],i[0],1,0],method="node")
+        for i in gr1.node_list:
+            i.sort()
         gr1.getarclist()
         return gr1
         
@@ -950,6 +970,9 @@ class graph:
         
         path = gr.search(s,t,capacity=1)[0]
         self.flow_var=[]
+        if path==[]:
+            print("No path found")
+            return 0
         while path!=[]:
             mincap = np.inf
             for i in range(len(path)-1):
@@ -986,9 +1009,9 @@ class graph:
         
     def push(self,active,s,t,verbose=0):
         flag=0
-        print(active)
-        for v in active:
-
+        tmp = active.copy()
+        for v in tmp:
+            f=0
             for j in v.getchild():
                 if self.dist[j.num]<self.dist[v.num] and v.getcapacity(j)>0:
                     
@@ -1000,23 +1023,47 @@ class graph:
                     if verbose>=1:
                         print("\nPushing volume ",round(f,2),"from ",v,"to ",j)
                         if verbose>=2:
-                            #print(v.getcapacity(j))
-                            #print("Left over excess at ",v," is ","{:.4e}".format(v.excess))
                             print("Left over excess at ",v," is ",round(v.excess,2))
                     
                     if j !=s and j!=t:
                         if j not in active:
-                            active.append(j)
-                        
+                            if active!=[]:
+                                if verbose>=3:
+                                    print("adding",j)
+                                f1 = 0
+                                for i in range(len(active)):
+                                
+                                    if active[i].num>j.num:
+                                        active.insert(i,j)
+                                        f1=1
+                                        break
+                                    
+                                if f1==0:
+                                    active.append(j)
+                            else:
+                                active.append(j)
+                                
+                    
+                    if verbose>=3:
+                        print("Active list:",active)         
                     self.replace_arc(v,j,v.getcost(j),v.getcapacity(j)-f)
                     self.replace_arc(j,v,j.getcost(v),j.getcapacity(v)+f)
                     
-                  
+                    
+                 
                 if v.excess ==0:
+                    active.remove(v)
+                    
                     if verbose>=2:
                         print("Removing ",v," from active list")
-                    active.remove(v)
+                        if verbose>=3:
+                            print("Active list:",active) 
                     break
+                if f>0:
+                    break
+                    
+            if flag==1:
+                break
             
         return flag
         
@@ -1024,15 +1071,18 @@ class graph:
             
     def relabel(self,active,verbose=0):
         min_val=np.inf
-        
+        if active==[]:
+            return 0
         for j in active:
             #print(j)
             if min_val>self.dist[j.num]:
                 v=j
+                min_val = self.dist[j.num]
+                
         
         w = min([self.dist[j.num] for j in v.getchild() if v.getcapacity(j)>0] )   
         if verbose>=1:
-            
+            #print("Active list:", active," Distance:",self.dist)
             print("\nRelabelling ",v," distance to ",w+1)
             #print(v.getchild(),v.excess)
         self.dist[v.num] = w+1
@@ -1051,6 +1101,8 @@ class graph:
         gr1 = self.create_residual_network()
         gr_tmp  = self.set_distance_lables(t)
         gr1.dist = gr_tmp.dist
+        if verbose>=1:
+            print('Inital Distance list: ',gr_tmp.dist)
         if isinstance(s, int):
             s = gr1.node_list[s]
         if isinstance(t, int):
@@ -1078,17 +1130,144 @@ class graph:
             if verbose>=1:
                 
                 print("Pushing volume ",j.excess,"from ",s,"to ",j)
+        iter1=1
         if verbose>=1:
+            
             print("\n*******Iteration starts******")
         while active!=[]:
             if gr1.push(active,s,t,verbose) == 0:
                 gr1.relabel(active,verbose=verbose)
-            #print(active,gr1.dist)
+            
+            if verbose>=1:
+                print("\n******Iteration ", iter1," Complete******\n", "Flow achieved ", t.excess,"\n")
+            iter1+=1
             
         self.flow = self.capacity_compare(gr1)   
         self.flow_val = t.excess
         return gr1,t.excess
         
+
+    def capacity_scaling(self,s,t,f,verbose=0):
+        """
+        Finds least cost for flowing "f" units of flow 
+        """
+        if verbose>=1:
+            print("******* Running Capacity Scaling Algorithm*******")
+        gr = self.create_residual_network()
+        if isinstance(s,int):
+           s = gr.node_list[s]
+        if isinstance(t,int):
+           t = gr.node_list[t]
+           
+        flow_cost = 0
+        remaining = f
+        path = gr.bell_ford(s,t,0)
+        if verbose>=1:
+            print("Initial Path: ",path)
+         
+        iter1 = 0
+        while path!=[] and remaining>0:
+            iter1+=1
+            if verbose>=1:
+                print("*****Iteration:",iter1,"******")
+                
+            c = np.inf
+            for i in range(len(path)-1):
+                c =min(c,path[i].getcapacity(path[i+1]))
+                
+            if verbose>=1:
+                print("Remaining:",remaining)
+                print("Minimum capacity:",c)
+                print("Remaining:",remaining-c)
+            remaining-= c
+            flow_cost+= c*gr.dist[-1]
+            
+            if verbose>=1:
+                print("Minimum Cost:",gr.dist[-1])
+        
+            
+            for i in range(len(path)-1):
+                 gr.replace_arc(path[i],path[i+1],path[i].getcost(path[i+1]),path[i].getcapacity(path[i+1])-c) 
+                 gr.replace_arc(path[i+1],path[i],path[i+1].getcost(path[i]),path[i+1].getcapacity(path[i])+c)
+               
+            if remaining > 0:
+                path = gr.bell_ford(s,t,0)
+                if verbose>=1:
+                    print("Path found:",path)
+        if remaining == 0:
+            flow = self.capacity_compare(gr)
+            if verbose>=1:
+                print("Paths found, Full flow complete, returning flow and flow cost")
+                print("Flow:",flow,"\n","Flow Cost:",flow_cost)
+            return flow,flow_cost
+        else:
+            print("Can not send ",f," units")
+            return [],np.inf
+                
+                
+    def maxflow_mincut(self,s,t,method=0,name="temp.xls",verbose=1):
+        if isinstance(s,int):
+           s = self.node_list[s]
+        if isinstance(t,int):
+           t = self.node_list[t]    
+    
+        wb = Workbook()
+  
+        # add_sheet is used to create sheet.
+        sheet1 = wb.add_sheet('Sheet 1')
+        sheet1.write(0,0,'Arcs')
+        sheet1.write(0,1,'Capacity')
+        iter1=1
+        for i in self.arclist:
+            sheet1.write(iter1,0,str(i[0].num)+"-"+str(i[1].num))
+            sheet1.write(iter1,1,i[3])
+            iter1+=1;
+        
+        
+        iter1=5
+        
+        style1 = xlwt.easyxf('pattern: pattern solid, fore_colour yellow;')
+        style2 = xlwt.easyxf('pattern: pattern solid, fore_colour blue;')
+        style3 = xlwt.easyxf('pattern: pattern solid, fore_colour orange;')
+        for i in self.node_list:
+            sheet1.write(0,iter1,"z_"+str(i.num))
+            sheet1.write(1,iter1,0)
+            sheet1.write(2,iter1,0,style1)
+            iter1+=1
+            
+        sheet1.write(1,iter1,xlwt.Formula("TRANSPOSE(B2:B"+str(len(self.arclist)+1)+")"))
+        for i in self.arclist:
+            sheet1.write(0,iter1,"y_"+str(i[0].num)+str(i[1].num))
+            sheet1.write(2,iter1,0,style1)
+            iter1+=1
+            
+        sheet1.write(0,iter1,"y_ts")
+        sheet1.write(2,iter1,0,style1)
+        sheet1.write(1,iter1,10**5)
+        sheet1.write(2,4,"variables")
+        sheet1.write(4,4,"Objective")
+        sheet1.write(4,5,xlwt.Formula("SUMPRODUCT(F2:"+chr(70+len(self.arclist)+len(self.node_list))+"2,F3:"+chr(70+len(self.arclist)+len(self.node_list))+"3)"),style2)
+        sheet1.write(5,4,"Constraints")
+        
+        iter2=1
+        for i in self.arclist:
+            sheet1.write(5+iter2,4,str(i[0].num) +"-"+str(i[1].num))
+            sheet1.write(5+iter2,5+i[0].num,1)
+            sheet1.write(5+iter2,5+i[1].num,-1)
+            sheet1.write(5+iter2,4+len(self.node_list)+iter2,1)
+            sheet1.write(5+iter2,iter1+2,xlwt.Formula("SUMPRODUCT(F"+str(5+iter2+1)+":"+chr(70+len(self.arclist)+len(self.node_list))+str(5+iter2+1)+",F3:"+chr(70+len(self.arclist)+len(self.node_list))+"3)"),style3)
+            sheet1.write(5+iter2,iter1+3,".GE.",style3)
+            sheet1.write(5+iter2,iter1+4,0,style3)
+            iter2+=1
+        sheet1.write(5+iter2,4, "t-s")
+        sheet1.write(5+iter2,5+s.num,-1)
+        sheet1.write(5+iter2,5+t.num,1)
+        sheet1.write(5+iter2,4+len(self.node_list)+iter2,1)
+        sheet1.write(5+iter2,iter1+2,xlwt.Formula("SUMPRODUCT(F"+str(5+iter2+1)+":"+chr(70+len(self.arclist)+len(self.node_list))+str(5+iter2+1)+",F3:"+chr(70+len(self.arclist)+len(self.node_list))+"3)"),style3)
+        sheet1.write(5+iter2,iter1+3,".GE.",style3)
+        sheet1.write(5+iter2,iter1+4,1,style3)
+        wb.save("Files/"+name)
+    
 class node:
     i = 0
 
@@ -1107,7 +1286,9 @@ class node:
     def __repr__(self):
         self.name = "N" + str(self.num)
         return self.name
-
+    
+    
+    
     def addparent(self, parent, cost=[], capacity=[]):
         if cost == []:
             cost = np.zeros(len(parent))
@@ -1207,7 +1388,16 @@ class node:
     def getchild(self):
         return self.__child
 
-
+    def sort(self):
+        c= self.__child.copy()        
+        cost = self.__cost.copy()
+        cap = self.__capacity.copy()
+        c_num = [i.num for i in c ]
+        c_sort = np.argsort(c_num)
+        for i in range(len(c)):
+            self.__child[i] = c[c_sort[i]]
+            self.__cost[i] = cost[c_sort[i]]
+            self.__capacity[i] = cap[c_sort[i]]            
 def timecalc(func):
     def wrap(*args, **kwargs):
         t1 = timer()
@@ -1229,13 +1419,111 @@ if __name__ == "__main__":
    
     gr = graph()
     gr.clear()
+    #gr.read_file("Data/network_2.txt")
     #gr.read_file('Data/Class_DP_ExNet.txt')
-    gr.read_file("Data/Edmonds_Karp_weak.txt")
+    #gr.read_file("Data/Edmonds_Karp_weak.txt")
     #gr.read_file("Data/ford_fulk_weak.txt")
     #gr.read_file("Data/Optimal_Loop.txt")
-    gr1=gr.ford_fulkerson(0,9)
+    #gr.create_randgraph(100,0.5)
+    #gr1=gr.ford_fulkerson(0,11)
+    gr.create_nodes(6)
+    gr.addarc([0,1,1,7])
+    gr.addarc([0,3,1,1])
+    gr.addarc([1,2,1,4])
+    gr.addarc([1,4,1,2])
+    gr.addarc([2,5,1,6])
+    gr.addarc([3,4,1,1])
+    gr.addarc([4,5,1,9])
+    gr.getarclist()
     
-    gr2 = gr.push_relabel(0,9,verbose=2)[0]
+    
+    
+    
+    """
+    gr.create_nodes(8)
+    gr.addarc([0,1,4,3])
+    gr.addarc([0,3,3,4])
+    gr.addarc([0,4,5,6])
+    gr.addarc([1,2,4,2])
+    gr.addarc([1,6,6,5])
+    gr.addarc([2,7,3,4])
+    gr.addarc([3,1,2,3])
+    gr.addarc([4,2,2,3])
+    gr.addarc([4,3,2,4])
+    gr.addarc([4,5,7,5])
+    gr.addarc([5,7,1,2])
+    gr.addarc([6,2,1,5])
+    gr.addarc([6,7,1,4])
+    gr.getarclist()
+    gr.capacity_scaling(0,7,6,1)
+    """
+    """
+    gr.create_nodes(8)
+    gr.addarc([0,1,1,10])
+    gr.addarc([1,2,1,2])
+    gr.addarc([1,3,1,2])
+    gr.addarc([1,4,1,1])
+    gr.addarc([1,5,1,1])
+    gr.addarc([2,6,1,1])
+    gr.addarc([3,6,1,1])
+    gr.addarc([4,6,1,1])
+    gr.addarc([5,6,1,2])
+    gr.addarc([6,7,1,10])
+    
+    gr.getarclist()
+    
+    gr2 = gr.push_relabel(0,7,verbose=2)
+    """
+    #gr.read_file("Data/Quiz3.txt")
+    #gr.read_file("Data/Quiz3-Part2.txt")
+    #a = gr.push_relabel(0,7,verbose=3)
+    """
+    gr.create_nodes(9)
+    gr.addarc([0,1,-3,1])
+    gr.addarc([0,2,-6,1])
+    gr.addarc([0,3,-2,1])
+    gr.addarc([1,4,-5,1])
+    gr.addarc([3,5,-2,1])
+    gr.addarc([1,6,-7,1])
+    gr.addarc([4,7,-4,1])
+    gr.addarc([5,7,-4,1])
+    gr.addarc([2,7,-4,1])
+    gr.addarc([7,8,0,1])
+    gr.addarc([6,8,0,1])
+    gr.getarclist()
+    
+    print(gr.mod_bell_ford(0,8))
+    """
+    """
+    gr.create_nodes(12)
+    gr.addarc([0,1,1,1.5])
+    gr.addarc([0,2,1,1.2])
+    gr.addarc([0,3,1,1.5])
+    gr.addarc([0,4,1,2.6])
+    gr.addarc([0,5,1,2.1])    
+    gr.addarc([1,5+2,1,10])
+    gr.addarc([1,5+3,1,10])
+    gr.addarc([2,5+4,1,10])
+    gr.addarc([2,5+5,1,10])
+    gr.addarc([3,5+3,1,10])
+    gr.addarc([3,5+4,1,10])
+    gr.addarc([4,5+1,1,10])
+    gr.addarc([4,5+2,1,10])
+    gr.addarc([4,5+3,1,10])
+    gr.addarc([4,5+4,1,10])
+    gr.addarc([5,5+2,1,10])
+    gr.addarc([5,5+3,1,10])
+    gr.addarc([5+1,11,1,1])
+    gr.addarc([5+2,11,1,2])
+    gr.addarc([5+3,11,1,2])
+    gr.addarc([5+4,11,1,3])
+    gr.addarc([5+5,11,1,1])
+    gr.getarclist()
+    #gr.writegraph("Data/Work_schedule.txt")
+    """
+    
+    
+
     #gr.plot(weight=1)
     #gr.writegraph(name="Data/ford_fulk_weak.txt")
     #gr.read_file("Data/Q2data.txt")
