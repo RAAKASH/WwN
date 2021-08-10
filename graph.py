@@ -945,7 +945,7 @@ class graph:
             if i[0] in i[1].getchild():
                 pass
             else:
-                gr1.addarc([i[1],i[0],1,0],method="node")
+                gr1.addarc([i[1],i[0],-i[2],0],method="node")
         for i in gr1.node_list:
             i.sort()
         gr1.getarclist()
@@ -1426,6 +1426,7 @@ if __name__ == "__main__":
     #gr.read_file("Data/Optimal_Loop.txt")
     #gr.create_randgraph(100,0.5)
     #gr1=gr.ford_fulkerson(0,11)
+    """
     gr.create_nodes(6)
     gr.addarc([0,1,1,7])
     gr.addarc([0,3,1,1])
@@ -1435,11 +1436,11 @@ if __name__ == "__main__":
     gr.addarc([3,4,1,1])
     gr.addarc([4,5,1,9])
     gr.getarclist()
-    
-    
-    
-    
     """
+    
+    
+    
+    #"""
     gr.create_nodes(8)
     gr.addarc([0,1,4,3])
     gr.addarc([0,3,3,4])
@@ -1456,7 +1457,7 @@ if __name__ == "__main__":
     gr.addarc([6,7,1,4])
     gr.getarclist()
     gr.capacity_scaling(0,7,6,1)
-    """
+    #"""
     """
     gr.create_nodes(8)
     gr.addarc([0,1,1,10])
