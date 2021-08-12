@@ -945,7 +945,7 @@ class graph:
             if i[0] in i[1].getchild():
                 pass
             else:
-                gr1.addarc([i[1],i[0],-i[2],0],method="node")
+                gr1.addarc([i[1],i[0],-i[2],0],method="node")#-i[2]
         for i in gr1.node_list:
             i.sort()
         gr1.getarclist()
@@ -1171,7 +1171,8 @@ class graph:
             if verbose>=1:
                 print("*****Iteration:",iter1,"******")
                 
-            c = np.inf
+            c = remaining
+            #c=np.inf
             for i in range(len(path)-1):
                 c =min(c,path[i].getcapacity(path[i+1]))
                 
@@ -1180,10 +1181,10 @@ class graph:
                 print("Minimum capacity:",c)
                 print("Remaining:",remaining-c)
             remaining-= c
-            flow_cost+= c*gr.dist[-1]
+            flow_cost+= c*gr.dist[t.num]
             
             if verbose>=1:
-                print("Minimum Cost:",gr.dist[-1])
+                print("Minimum Cost:",gr.dist[t.num])
         
             
             for i in range(len(path)-1):
@@ -1201,11 +1202,33 @@ class graph:
                 print("Flow:",flow,"\n","Flow Cost:",flow_cost)
             return flow,flow_cost
         else:
+            
             print("Can not send ",f," units")
             return [],np.inf
                 
                 
     def maxflow_mincut(self,s,t,method=0,name="temp.xls",verbose=1):
+        """
+        Note: Use this only if absolutely necessary else use your brain, you might get faster results
+
+        Parameters
+        ----------
+        s : Int or node
+            start node.
+        t : Int or node
+            End node.
+        method : int, optional
+            DESCRIPTION. The default is 0.
+        name : String, optional
+            DESCRIPTION. Name of excel file The default is "temp.xls".
+        verbose : TYPE, optional
+            DESCRIPTION. The default is 1.
+
+        Returns
+        -------
+        None.
+
+        """
         if isinstance(s,int):
            s = self.node_list[s]
         if isinstance(t,int):
@@ -1246,7 +1269,11 @@ class graph:
         sheet1.write(1,iter1,10**5)
         sheet1.write(2,4,"variables")
         sheet1.write(4,4,"Objective")
-        sheet1.write(4,5,xlwt.Formula("SUMPRODUCT(F2:"+chr(70+len(self.arclist)+len(self.node_list))+"2,F3:"+chr(70+len(self.arclist)+len(self.node_list))+"3)"),style2)
+        try:
+            sheet1.write(4,5,xlwt.Formula("SUMPRODUCT(F2:"+chr(70+len(self.arclist)+len(self.node_list))+"2,F3:"+chr(70+len(self.arclist)+len(self.node_list))+"3)"),style2)
+        except:
+            print("Update the formula manually in excel")
+            
         sheet1.write(5,4,"Constraints")
         
         iter2=1
@@ -1255,7 +1282,10 @@ class graph:
             sheet1.write(5+iter2,5+i[0].num,1)
             sheet1.write(5+iter2,5+i[1].num,-1)
             sheet1.write(5+iter2,4+len(self.node_list)+iter2,1)
-            sheet1.write(5+iter2,iter1+2,xlwt.Formula("SUMPRODUCT(F"+str(5+iter2+1)+":"+chr(70+len(self.arclist)+len(self.node_list))+str(5+iter2+1)+",F3:"+chr(70+len(self.arclist)+len(self.node_list))+"3)"),style3)
+            try:
+                sheet1.write(5+iter2,iter1+2,xlwt.Formula("SUMPRODUCT(F"+str(5+iter2+1)+":"+chr(70+len(self.arclist)+len(self.node_list))+str(5+iter2+1)+",F3:"+chr(70+len(self.arclist)+len(self.node_list))+"3)"),style3)
+            except:
+                print("Enter the formula manually in excel")
             sheet1.write(5+iter2,iter1+3,".GE.",style3)
             sheet1.write(5+iter2,iter1+4,0,style3)
             iter2+=1
@@ -1263,7 +1293,10 @@ class graph:
         sheet1.write(5+iter2,5+s.num,-1)
         sheet1.write(5+iter2,5+t.num,1)
         sheet1.write(5+iter2,4+len(self.node_list)+iter2,1)
-        sheet1.write(5+iter2,iter1+2,xlwt.Formula("SUMPRODUCT(F"+str(5+iter2+1)+":"+chr(70+len(self.arclist)+len(self.node_list))+str(5+iter2+1)+",F3:"+chr(70+len(self.arclist)+len(self.node_list))+"3)"),style3)
+        try:
+            sheet1.write(5+iter2,iter1+2,xlwt.Formula("SUMPRODUCT(F"+str(5+iter2+1)+":"+chr(70+len(self.arclist)+len(self.node_list))+str(5+iter2+1)+",F3:"+chr(70+len(self.arclist)+len(self.node_list))+"3)"),style3)
+        except:
+            print("Enter the formula manually in excel")
         sheet1.write(5+iter2,iter1+3,".GE.",style3)
         sheet1.write(5+iter2,iter1+4,1,style3)
         wb.save("Files/"+name)
@@ -1419,6 +1452,8 @@ if __name__ == "__main__":
    
     gr = graph()
     gr.clear()
+    gr.read_file("Data/Quiz-4.txt")
+    #gr.read_file("Data/q4-3.txt")
     #gr.read_file("Data/network_2.txt")
     #gr.read_file('Data/Class_DP_ExNet.txt')
     #gr.read_file("Data/Edmonds_Karp_weak.txt")
@@ -1440,7 +1475,7 @@ if __name__ == "__main__":
     
     
     
-    #"""
+    """
     gr.create_nodes(8)
     gr.addarc([0,1,4,3])
     gr.addarc([0,3,3,4])
@@ -1457,7 +1492,7 @@ if __name__ == "__main__":
     gr.addarc([6,7,1,4])
     gr.getarclist()
     gr.capacity_scaling(0,7,6,1)
-    #"""
+    """
     """
     gr.create_nodes(8)
     gr.addarc([0,1,1,10])
