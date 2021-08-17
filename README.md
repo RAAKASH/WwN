@@ -15,7 +15,9 @@ For the cython HTML generation type the below code.
   <li>Shortest Path algorithms: (Modified) Bellman ford, Floyd Warshall, Dynamic programming, Second shortest path, arbitrage algorithm.</li>
   <li> Heuristics algoithm: A* (Dijkstras).
   <li> Miscellaneous: Optimal Loop, Binary search
-  <li> Maximum Flow: Ford Fulkerson (Edmonds Karp Implementation), Push-relabel.
+  <li> Maximum Flow: Ford Fulkerson (Edmonds Karp Implementation), Push-relabel, maxflow-mincut.
+  <li> Minimum cost flow: Capacity scalling, cycle cancelling.
+  <li> Demand supply algos: Northwest, minimum cost, vogel's approximation.
 </ul>
 
 <h2> Upcoming algorithms </h2>
