@@ -396,10 +396,13 @@ class graph:
             
             change = False
             for i in self.arclist:
-                if(i[1].dist>i[0].dist+i[0].getcost(i[1])):
-                    i[1].dist = i[0].dist+i[0].getcost(i[1])
-                    i[1].temp_parent = i[0]
-                    change=True
+                #Added additional capacity constraint to prevent 0 capacity arcs
+                if i[0].getcapacity(i[1])>0:
+
+                    if(i[1].dist>i[0].dist+i[0].getcost(i[1])):
+                        i[1].dist = i[0].dist+i[0].getcost(i[1])
+                        i[1].temp_parent = i[0]
+                        change=True
             if verbose>=2:
                 print("\n"+"Iteration:"+str(iter1+1))
                 for i in self.node_list:
@@ -408,7 +411,7 @@ class graph:
                 for i in self.node_list:
                     print(i.temp_parent,end=" ")
             iter1=iter1+1;
-            if iter1>= len(self.node_list)*2+1:
+            if iter1>= len(self.node_list)*1+1:
                 print("")
                 print("Negative loop found",e.dist)
                 
@@ -423,7 +426,7 @@ class graph:
             if verbose>=1:
                 print("\nPath found")
             prt = e
-            tmp = len(self.node_list)*2
+            tmp = len(self.node_list)*1
             while 1:
                 if prt==s:
                     print([prt]+path)
@@ -432,7 +435,7 @@ class graph:
                     path =[prt]+path
                     prt = prt.temp_parent
                 iter1=iter1+1
-                if iter1>tmp:
+                if iter1>tmp+1:
                     print("Negative Loop in path finding")
                     return []
     def bell_ford(self,s,e,verbose=1):
@@ -468,7 +471,7 @@ class graph:
                         dist_copy[i[1].num] = dist[i[0].num]+i[0].getcost(i[1])
                         i[1].temp_parent = i[0]
                         change=True
-                distmat.append(dist_copy)
+            distmat.append(dist_copy)
             
             dist = dist_copy
             if verbose>=2:
@@ -477,24 +480,33 @@ class graph:
                 for i in self.node_list:
                     print(i.temp_parent,end=" ")
             iter1=iter1+1;
-            if iter1>=len(self.node_list)*2:
+            if iter1>=len(self.node_list)*1+2:
+                if verbose>=1:
+                    print("Breaking Bellman ford algorithm, Negative cycle found")
                 break
         self.dist = dist
-        self.distmat=distmat            
+        self.distmat=distmat  
+        
+        path = []          
         if dist[e.num]==np.inf:
             print("path not found")
         else:
-            path = []
+            iter1 = 0
             if verbose>=1:
                 print("\nPath found")
             prt = e
             while 1:
+                
                 if prt==s:
-                    return [prt]+path
+                    path = [prt]+path
+                    break
                 else:
                     path =[prt]+path
                     prt = prt.temp_parent
-    
+                iter1+=1;
+                if iter1>len(self.node_list)+1:
+                    break
+        return path
                     
     def dijkstra(self,s,e=None,verbose=0):
         """
@@ -1152,7 +1164,7 @@ class graph:
         Finds least cost for flowing "f" units of flow 
         """
         if verbose>=1:
-            print("******* Running Capacity Scaling Algorithm*******")
+            print("\n******* Running Capacity Scaling Algorithm*******")
         gr = self.create_residual_network()
         if isinstance(s,int):
            s = gr.node_list[s]
@@ -1205,7 +1217,282 @@ class graph:
             
             print("Can not send ",f," units")
             return [],np.inf
+      
+
+    def cycle_cancelling(self,s,t,f,verbose=0):
+        if verbose>=1:
+            print("\n******* Running Cycle cancelling Algorithm*******")
+        gr = self.create_residual_network()
+        if isinstance(s,int):
+           s = gr.node_list[s]
+        if isinstance(t,int):
+           t = gr.node_list[t]
+        
+        
+        flow_cost = 0
+        remaining = f
+        path = gr.search(s,t,verbose=0,capacity=1)[0]
+        cost=0
+        for i in range(1,len(path)):
+            cost += path[i-1].getcost(path[i])
+        
+        if verbose>=1:
+            print("Initial Path: ",path)
+         
+        iter1 = 0
+        while path!=[] and remaining>0:
+            iter1+=1
+            if verbose>=1:
+                print("*****Iteration:",iter1,"******")
                 
+            c = remaining
+            
+            for i in range(len(path)-1):
+                c =min(c,path[i].getcapacity(path[i+1]))
+                
+            if verbose>=1:
+                print("Remaining:",remaining)
+                print("Minimum capacity:",c)
+                print("Remaining:",remaining-c)
+            remaining-= c
+            flow_cost+= c*cost
+            
+            if verbose>=1:
+                print("Minimum Cost:",cost)
+        
+            
+            for i in range(len(path)-1):
+                 gr.replace_arc(path[i],path[i+1],path[i].getcost(path[i+1]),path[i].getcapacity(path[i+1])-c) 
+                 gr.replace_arc(path[i+1],path[i],path[i+1].getcost(path[i]),path[i+1].getcapacity(path[i])+c)
+               
+            if remaining > 0:
+                path = gr.search(s,t,verbose=0,capacity=1)[0]
+                cost=0
+                for i in range(1,len(path)):
+                    cost += path[i-1].getcost(path[i])
+                if verbose>=1:
+                    print("Path found:",path)
+            
+            
+                    
+        if remaining == 0:
+            flow = self.capacity_compare(gr)
+            if verbose>=1:
+                print("Paths found, Full flow complete, returning flow and flow cost")
+                print("Flow:",flow,"\n","Flow Cost:",flow_cost)
+            #return flow,flow_cost
+        else:
+            
+            print("Can not send ",f," units")
+            #return [],np.inf
+           
+        
+        
+        #print(np.array(gr.distmat)[-1,:],np.array(gr.distmat)[-2,:])
+        
+        def negative_cycle(gr,s,t,verbose=0):
+            if verbose>=1:
+                print("Obtaining Negative cycles")
+            gr.bell_ford(s,t,verbose-1);
+            m,n = np.shape(gr.distmat)
+            cycle_nodes=[]
+            if m>=len(gr.node_list)-1:
+                for i in range(n):
+                    if gr.distmat[m-1][i]!=gr.distmat[m-2][i]:
+                        cycle_nodes.append(gr.node_list[i])
+                if verbose>=1:
+                    print("cycle nodes:",cycle_nodes)
+            else:
+                if verbose>=1:
+                    print("No Negative cost cycles found")
+            
+            cycle=[]
+            if cycle_nodes!=[]:
+                tmp = cycle_nodes[0]
+                
+                cycle.append(tmp)
+                    
+                while 1:
+                    tmp = tmp.temp_parent
+                    if tmp in cycle:
+                        temp_ind  = cycle.index(tmp)
+                        cycle=[tmp] + cycle
+                        
+                        break
+                    else:
+                        cycle = [tmp] + cycle
+                        
+                #print(cycle)
+                for i in range(temp_ind+2, len(cycle)):
+                    cycle.pop(-1)
+                  
+                #print(cycle)
+            return cycle
+         
+        
+        if verbose>=1:
+            print("********Running Cycle cancelling part******")
+        cycle  = negative_cycle(gr,s,t,verbose)
+        iter1 = 0;
+       
+        while cycle!=[]:
+            if verbose>=1:
+                print("***Iteration",iter1,"***")
+            cost=0
+            for i in range(1,len(cycle)):
+                cost += cycle[i-1].getcost(cycle[i])
+                #print(cycle[i-1].getcost(cycle[i]))
+            if verbose>=1:
+                print("Negative cycle found:",cycle," Cost:",cost)
+            
+            c = np.inf
+            for i in range(len(cycle)-1):
+                #print(cycle[i].getcapacity(cycle[i+1]))
+                c =min(c,cycle[i].getcapacity(cycle[i+1]))
+            
+            if verbose>=1:
+                print("Minimum cost:",cost)
+            
+            flow_cost = flow_cost + c*cost
+            
+            for i in range(len(cycle)-1):
+                 gr.replace_arc(cycle[i],cycle[i+1],cycle[i].getcost(cycle[i+1]),cycle[i].getcapacity(cycle[i+1])-c) 
+                 gr.replace_arc(cycle[i+1],cycle[i],cycle[i+1].getcost(cycle[i]),cycle[i+1].getcapacity(cycle[i])+c)
+            
+           
+            cycle  = negative_cycle(gr,s,t,verbose)
+        
+        flow = self.capacity_compare(gr)
+        if verbose>=1:
+            print("Paths found, Full flow complete, returning flow and flow cost")
+            print("Flow:",flow,"\n","Flow Cost:",flow_cost)
+        return flow,flow_cost
+    
+    
+    def northwest_corner(self,C,D,K):
+        x = np.zeros(np.shape(C))
+        cost = 0
+        r=0
+        c=0
+        while r< np.shape(C)[0] and c< np.shape(C)[1]:
+            x[r,c] = min(K[r],D[c])
+            cost = cost + x[r,c]*C[r,c]
+            K[r] = K[r]- x[r,c]
+            D[c] = D[c]- x[r,c]
+            if K[r]==0:
+                r+=1
+            if D[c]==0:
+                c+=1
+        return cost,x
+    
+    def minimum_cost(self,C,D,K):
+        x = np.zeros(np.shape(C))
+        C = C.astype('float64')
+        cost = 0
+        r=0
+        c=0
+        while np.sum(D)>0:
+            if np.min(C)!=np.inf:
+                tmp = np.where(C == np.min(C))
+                r = tmp[0][0]
+                c = tmp[1][0]
+                #print(r,c)
+                x[r,c] = min(K[r],D[c])
+                
+                cost = cost + x[r,c]*C[r,c]
+                K[r] = K[r]- x[r,c]
+                D[c] = D[c]- x[r,c]
+                #print(D,K)
+                if K[r]==0:
+                    C[r,:] = np.inf
+                if D[c]==0:
+                    C[:,c] = np.inf
+            else:
+                break
+        return cost,x
+    
+    
+    def vogel_approximation(self,C,D,K,verbose=1):
+        x = np.zeros(np.shape(C))
+        C = C.astype('float64')
+        m,n =  np.shape(C)
+        cost = 0
+        r=0
+        c=0
+        suppliers_left = m
+        demands_unmet = n
+        while suppliers_left>1 and demands_unmet>1:
+            max_penalty = -1
+            for i in range(m):
+                if K[i]>0:
+                    tmp = C[i,:].copy()
+
+                    m_tmp = tmp.argmin()
+                    #print(m_tmp)
+                    tmp.sort()
+                    row_penalty = tmp[1]-tmp[0]
+                    
+                    if verbose>=1:
+                        print("Supply opportunity cost:",i,row_penalty)
+                    if row_penalty>max_penalty:
+                        max_penalty = row_penalty
+                        frm = i
+                        to = m_tmp
+            for j in range(n):
+                if D[j]>0:
+                    tmp = C[:,j].copy()
+                    m_tmp = tmp.argmin()
+                    #print(m_tmp)
+                    tmp.sort()
+                    column_penalty = tmp[1]-tmp[0]
+                    if verbose>=1:
+                        print("Demand opportunity cost:",j,column_penalty)
+                    if column_penalty>max_penalty:
+                        max_penalty = column_penalty
+                        frm = m_tmp
+                        to = j
+                        
+            
+            x[frm,to] = min(K[frm],D[to])
+            
+            if verbose>=1:
+                print(frm,to)
+                print(x)
+                
+            cost = cost+C[frm,to]*x[frm,to]
+            
+            K[frm]=K[frm]-x[frm,to]
+            D[to] = D[to]-x[frm,to]
+            
+            if verbose>=1:
+                print(D,K)
+            if K[frm]==0:
+                
+                C[frm,:] = np.inf
+                suppliers_left-=1
+            
+            if D[to]==0:
+                C[:,to]=np.inf
+                demands_unmet-=1
+                
+        if suppliers_left==1:
+            frm = np.argmax(K)
+            for j in range(n):
+                if D[j]>0:
+                    x[frm,j] = D[j]
+                    cost+=C[frm,j]*x[frm,j]
+                    
+                    
+        else:
+            to = np.argmax(D)
+            for i in range(m):
+                if K[i]>0:
+                    x[i,to] = K[i]
+                    cost+=C[i,to]*x[i,to]
+                    
+        return cost,x
+            
+                    
                 
     def maxflow_mincut(self,s,t,method=0,name="temp.xls",verbose=1):
         """
@@ -1453,6 +1740,9 @@ if __name__ == "__main__":
     gr = graph()
     gr.clear()
     gr.read_file("Data/Quiz-4.txt")
+    C=np.array([[15,24,12],[12,27,18],[9,15,27]])
+    D = [100,250,200]
+    K=[125,250,175]
     #gr.read_file("Data/q4-3.txt")
     #gr.read_file("Data/network_2.txt")
     #gr.read_file('Data/Class_DP_ExNet.txt')
