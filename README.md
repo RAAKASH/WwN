@@ -21,7 +21,8 @@ For the cython HTML generation type the below code.
 </ul>
 
 <h2> Upcoming algorithms </h2>
-
+<li> K-Shortest path algorithm (Yes's version)
+<li> Bi-Directional Dijkstra
 <ul style="list-style-type:disc;">
   <li>None</li>
 
