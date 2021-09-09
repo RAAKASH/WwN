@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Sep  3 01:56:25 2021
+
+@author: Aakash R
+"""
+import heapq
+import cProfile
 import numpy as np
 import networkx as nx
 from tqdm import tqdm
@@ -7,7 +15,8 @@ import re
 #from pyvis.network import Network
 import matplotlib.pyplot as plt
 from timeit import default_timer as timer
-from WwN.Algorithms import*
+from WwN.Algorithms import *
+
 class graph:
     def __repr__(self):
         return (str(self.getgraph()))
@@ -19,6 +28,8 @@ class graph:
         self.path_dfs = []
         self.parent_list = []
         self.temp_read_file_name = []
+        self.graph_type = "node"
+        self.cache =[]
     def create_nodes(self, m):
         """ Create "m" number of nodes and returns the same
         """
@@ -42,13 +53,16 @@ class graph:
 
             else:
                 a[0] = list(map(int, a[0]))
-          
+            #print(len(a))
+            #print(a)
             for i in range(1,len(a)):
+                #print(i)
                 a[i] = a[i].replace("\n", "")
                 a[i] = a[i].split()
+               
                 #a[i] = list(map(float, a[i]))
                 a[i] = [int(a[i][0])+n,int(a[i][1])+n,float(a[i][2]),float(a[i][3])]
-
+                
                 #a[i] = [int(a[i][0]),int(a[i][1]),np.float(a[i][2]),np.float(a[i][3])]
             if len(a[0])>2:
                 #print(a[-1][0])
@@ -74,13 +88,107 @@ class graph:
                 
         self.getarclist()
         self.getgraph()
+    
+    
+    def delete_node(self,s):
+        """
+        Function does not actually delete the node, but rather replaces costs to all...
+        parent and child nodes to infinity. This is a temporary deletion, clear_cache ...
+        function needs to be called for permanent deletion
 
+        Parameters
+        ----------
+        s : Node to be deleted
+            
+
+        Returns nothinh
+        -------
+
+
+        """
+        if isinstance(s,int):
+            s = self.node_list[s]
+        
+        for c in s.getchild():
+            if s.getcost(c) !=np.inf:
+                self.cache.append([s,c,s.getcost(c),s.getcapacity(c)])
+            #self.replace_arc(s, c, np.inf)
+            s.replacecost(c, np.inf)
+            
+        for p in s.getparent():
+            if p.getcost(s) !=np.inf:
+                self.cache.append( [p,s,p.getcost(s),p.getcapacity(s)])
+            p.replacecost(s, np.inf)
+            
+    def delete_arc(self,s,c):
+        """
+        Function does not actually delete the Arc, but rather replaces costs to all...
+        parent and child nodes to infinity. This is a temporary deletion, clear_cache ...
+        function needs to be called for permanent deletion
+        
+
+        Parameters
+        ----------
+        s : Node1 
+            
+        c : Node2
+
+        Returns
+        -------
+        None.
+
+        """
+        if [s,c,s.getcost(c),s.getcapacity(c)] not in self.cache:
+            self.cache.append([s,c,s.getcost(c),s.getcapacity(c)])
+        s.replacecost(c, np.inf)
+        
+    def clear_cache(self):
+        """
+        Permanently deletes all node and arcs previously deleted
+        Returns
+        -------
+        None.
+
+        """
+        self.cache=[]
+        self.getarclist()
+    
+    def restore_cache(self):
+        """
+        Restores elements deleted temporarily using functions deletenode and deletearc
+
+        Returns
+        -------
+        None.
+
+        """
+        for i in self.cache:
+            i[0].replacecost(i[1],i[2])
+        self.cache =[]
+        
     def get_arcinfo(self, a, b):
+        """
+        
+
+        Parameters
+        ----------
+        a : Arc node1 (int)
+        b : Arc node2 (int)
+
+        Returns
+        -------
+        list: [cost, capacity]
+            
+        """
         a = self.node_list[a]
         b = self.node_list[b]
         return ([a.getcost(b), a.getcapacity(b)])
 
     def clear(self):
+        """
+        Clears graph
+
+        """
         self.i = 0
         self.node_list = []
         self.graph = {}
@@ -108,7 +216,7 @@ class graph:
                     self.arclist.append([j, k, j.getcost(k), j.getcapacity(k)])
         return self.arclist
 
-    def getgraph(self, type="non_adj"):
+    def getgraph(self, type="non_adj",method="node"):
         """ Dicitonary based graph
         
         Input: type (optional)\n
@@ -119,13 +227,28 @@ class graph:
             for j in self.node_list:
                 self.graph[j] = j.getchild()
 
-        else:
+        elif type=="non_adj" and method=="node":
             for j in self.node_list:
                 if j.getchild() == []:
                     pass
                 else:
                     self.graph[j] = j.getchild()
-
+           
+        self.graph_type2="num"
+        self.graph2={}
+        
+        for j in self.node_list:
+            if j.getchild() == []:
+                pass
+            else:
+                tmp ={}
+                for c in j.getchild():
+                    tmp[c.num] = j.getcost(c)    
+                 
+                self.graph2[j.num] = tmp
+                
+                        
+                        
         return self.graph
     def copy(self):
         gr = graph()
@@ -429,7 +552,8 @@ class graph:
             tmp = len(self.node_list)*1
             while 1:
                 if prt==s:
-                    print([prt]+path)
+                    if verbose>=1:
+                        print([prt]+path)
                     return [prt]+path
                 else:
                     path =[prt]+path
@@ -507,9 +631,128 @@ class graph:
                 if iter1>len(self.node_list)+1:
                     break
         return path
-                    
+    
+    
+    def dijkstra_cyth(self,s,e=None,verbose=0):
+        """
+        Cythonized Dijkstra code: An attempt to increase speed but little to no increase in speed
+        Output: Path and distance
+        Use obj.path, obj.dist for accessing path and distance
+        """
+        
+        
+        if isinstance(s,int):
+            s = self.node_list[s]
+        if isinstance(e,int):
+            e = self.node_list[e] 
+        n = len(self.node_list)
+        dist = np.array([np.inf]*len(self.node_list))
+        temp_parent= np.array([0]*len(self.node_list))
+        
+        dijkstra(n, dist,temp_parent,s.num,e.num, self.graph2, verbose)
+    
+    
+        path = []
+
+               
+        if e!=None:         
+            if dist[e.num]!=np.inf:
+                if verbose>=1:
+                    print("\nPath found")
+                prt = e
+                while 1:
+                    if prt==s:
+                        path = [prt]+path
+                        break
+                    else:
+                        #print(prt.num)
+                        path =[prt]+path
+                        prt = self.node_list[temp_parent[prt.num]]
+        else:
+            path=[]
+            
+        self.dist = dist
+        self.path = path
+        if e is None:
+            return (path,dist)
+        else:
+            return (path,dist[e.num])
     def dijkstra(self,s,e=None,verbose=0):
         """
+        Dijkstra implmented using priority queue
+        Input: Start Node, End node (optional), verbose (for printing levels, optional)
+        Output: Path and distance (single value or list depending on whether e is provided or not)
+        Additional info: Use obj.path, obj.dist for accessing path and distance
+        """
+        if isinstance(s,int):
+            s = self.node_list[s]
+        if isinstance(e,int):
+            e = self.node_list[e] 
+        
+        
+        path = []
+        dist = np.array([np.inf]*len(self.node_list))
+        dist[s.num] = 0
+        fixed = np.array([0]*len(self.node_list))
+        fixed[s.num]=1
+        chosen = [s]
+        iter1=1
+        q = [(0,s)]
+        cost,chosen = heapq.heappop(q)
+        while 1:
+            for j in chosen.getchild():
+                overall_cost = cost+chosen.getcost(j)
+                if dist[j.num]>overall_cost:
+                    dist[j.num]=overall_cost
+                    j.temp_parent = chosen
+                    heapq.heappush(q,(overall_cost,j.num))
+                    
+            if verbose>=2:
+                print("Iteration:",iter1)
+                print("chosen")
+                iter1=iter1+1
+                print(chosen)
+           
+            if q == []:
+                if verbose>=1:
+                    print("No Path")
+                
+                return ([],np.inf)
+            cost,chosen = heapq.heappop(q)
+            chosen = self.node_list[chosen]
+            #print(chosen)
+            
+            if e == chosen:
+                break
+               
+        if e!=None:         
+            if dist[e.num]!=np.inf:
+                if verbose>=1:
+                    print("\nPath found")
+                    
+                prt = e
+                while 1:
+                    
+                    if prt==s:
+                        path = [prt]+path
+                        break
+                    else:
+                        #print(prt.num)
+                        path =[prt]+path
+                        prt = prt.temp_parent
+        else:
+            path=[]
+        self.dist = dist
+        self.path = path
+        if e ==None:
+            return (path,dist[e.num])
+        else:
+            return (path,dist)  
+                    
+    def dijkstra_naive(self,s,e=None,verbose=0):
+        """
+        Dijstra implemented using no fancy data structures
+        Input: Start node, end node (optional), verbose (printing level, optional)
         Output: Path and distance
         Use obj.path, obj.dist for accessing path and distance
         """
@@ -517,7 +760,8 @@ class graph:
             s = self.node_list[s]
         if isinstance(e,int):
             e = self.node_list[e] 
-            
+        
+        
         path = []
         dist = np.array([np.inf]*len(self.node_list))
         dist[s.num] = 0
@@ -531,7 +775,7 @@ class graph:
                    if dist[j.num]>dist[c.num]+c.getcost(j):
                         dist[j.num]=dist[c.num]+c.getcost(j)
                         j.temp_parent = c
-
+                        
                 if verbose>=2:
                     print("Iteration:",iter1)
                     print("chosen")
@@ -544,16 +788,19 @@ class graph:
                 break
             else:
 
-                k = min(tmp)
+                k = np.min(tmp)
                 #print(k)
                 k = np.where(dist==k)
                 k = k[0]
                 chosen = []
                 for l in k:
+                    
                     fixed[l]=1
                     chosen.append( self.node_list[l])
-                    
             
+            if e in chosen:
+                break
+               
         if e!=None:         
             if dist[e.num]!=np.inf:
                 if verbose>=1:
@@ -572,8 +819,10 @@ class graph:
             path=[]
         self.dist = dist
         self.path = path
-        return (path,dist)
-    
+        if e is None:
+            return (path,dist)
+        else:
+            return (path,dist[e.num])
     def arbitrage(self,arbitrage_node=0,verbose=0):
         """ Arbitrage algorithm - Uses bellman ford
         
@@ -641,6 +890,7 @@ class graph:
         
         path[0].dist=0
         for i in range(len(path)-1):
+            #print(c)
             c=c+path[i].getcost(path[i+1])
             path[i+1].dist=c
         return c
@@ -782,6 +1032,83 @@ class graph:
             
         return path
     
+    def N_shortest_paths(self,s,e,n=3,D=None,verbose=0):
+        """
+        
+
+        Parameters
+        ----------
+        s : int/Node
+            Start node.
+        e : int/Node
+            End node.
+        n : int, optional
+            No of shortest paths required. The default is 3.
+        D : Numpy matrix, optional
+            Distance matrix. The default is None.
+        verbose : int, optional
+            DESCRIPTION. Printing levels.
+
+        Returns
+        -------
+        A : list
+            List of shortest paths.
+        a : list
+            List of shortest path lengths.
+
+        """
+        A = [] #List of shortest paths
+        a = [] #List of shortest paths lengths
+        B = [] # Temporary list of paths in consideration
+        if isinstance(s,int):
+            s = self.node_list[s]
+        if isinstance(e,int):
+            e = self.node_list[e] 
+            
+        
+        
+        A_tmp1,a_tmp1 = self.Astar(s,e,D)
+        A.append(A_tmp1)
+        a.append(a_tmp1)
+        for k in tqdm(range(1,n)):
+            deleted_nodes=[]
+            deleted_arcs =[]
+            for i in (range(0,len(A[-1])-1)):
+                if verbose>=2:
+                    print("Iteration ",i)
+                spurNode = A[-1][i]
+                rootPath = A[-1][0:i+1]
+                
+                for p in A:
+                    if rootPath  == p[0:i+1]:
+                        if (p[i],p[i+1]) not in deleted_arcs:
+                         
+                            self.delete_arc(p[i],p[i+1])
+                            deleted_arcs.append((p[i],p[i+1]))
+                         
+                for n in rootPath:
+                    if n!=spurNode:
+                        if n not in deleted_nodes:
+                            self.delete_node(n)
+                            deleted_nodes.append(n)
+                
+                spurPath,length2 =self.Astar(spurNode,e,D);
+                totalPath = rootPath[0:-1] + spurPath;
+                self.restore_cache()
+                length_tmp = self.get_path_cost(rootPath)
+                if (length_tmp+length2,totalPath) not in B:
+                    heapq.heappush(B,(length_tmp+length2,totalPath))
+                        
+                
+                
+                deleted_nodes=[]
+                deleted_arcs =[]
+            
+            min_len,min_path = heapq.heappop(B)
+            A.append(min_path)
+            a.append(min_len)
+     
+        return (A,a)
     
     def second_best_path(self,pth):
         """  Returns the second best path\n
@@ -794,7 +1121,7 @@ class graph:
         tmp_path=[]
         tmp_cost=np.inf
         secondary_paths = []
-        for i in range(len(pth)):
+        for i in tqdm(range(len(pth))):
             if pth[i] == pth[-1]:
                 break
             tmp = pth[i].getcost(pth[i+1])
@@ -807,9 +1134,9 @@ class graph:
                 tmp_cost = pth[-1].dist+tmp_cost1
                 tmp_path = pth[0:i]+pth1
                 secondary_paths.append(tmp_path)
-                print(tmp_cost,tmp_path)
+                #print(tmp_cost,tmp_path)
             else:
-                print(pth[-1].dist+tmp_cost1,pth[0:i]+pth1)
+                #print(pth[-1].dist+tmp_cost1,pth[0:i]+pth1)
                 secondary_paths.append(pth[0:i]+pth1)
             
             self.replace_arc(pth[i],pth[i+1],tmp)
@@ -818,10 +1145,86 @@ class graph:
         return (tmp_path,tmp_cost)
         
 
-    
-    def Astar(self,s,e,D=np.array([0]),verbose=0):
+
+    def Astar(self,s,e=None,D=None,verbose=0):
         
         """
+        Function uses priority queues
+        A* Algorithm \n
+        Input: s (Start node), e (end node), D = Distance matrix - (Astar, Dijkstras),verbose=0/1/2 
+        Output: Shortest path
+        """
+        if isinstance(s,int):
+            s = self.node_list[s]
+        if isinstance(e,int):
+            e = self.node_list[e] 
+            
+        if D is None:
+            # D is none implies Astar is dijkstra
+            pth,dist = dijkstra(self,s,e,verbose)
+            return (pth,dist)
+            #D=np.zeros((len(self.node_list),len(self.node_list)))
+        
+        path = []
+        dist = np.array([np.inf]*len(self.node_list)) # distance from source node
+        dist[s.num]=0
+        
+        q = [(D[s.num,e.num],s)]
+        c=s
+        cost = 0
+        iter1=1
+        
+        while q is not []:
+            
+            for i in c.getchild():
+                overall_cost = dist[c.num] + c.getcost(i)
+                if dist[i.num]>overall_cost:
+                    dist[i.num] = overall_cost
+                    i.temp_parent=c
+                    heapq.heappush(q, (overall_cost+D[i.num,e.num],i))
+                #print(i,c.getcost(i))
+            
+            if q==[]:
+                return ([],np.inf)
+            cost, c = heapq.heappop(q)
+                
+            if verbose>=1:
+                print("\nIteration:",iter1)
+                iter1=iter1+1
+                print("Nodes fixed:",c)
+            
+            
+              
+            if c==e:
+                break
+                
+            
+             
+        if dist[e.num]!=np.inf:
+            if verbose>=1:
+                print("\nPath found")
+            prt = e
+            while 1:
+                
+                if prt==s:
+                    path = [prt]+path
+                    break
+                else:
+                    #print(path)
+                    path =[prt]+path
+                    prt = prt.temp_parent
+                
+        self.dist = dist
+        self.path = path
+        if e is None:
+            return (path,dist)
+        else:
+            return (path,dist[e.num])
+    
+    def Astar_naive(self,s,e,D=np.array([0]),verbose=0):
+        
+        """
+        Function does not use priority queues
         A* Algorithm \n
         Input: s (Start node), e (end node), D = Distance function - (Astar, Dijkstras),verbose=0/1/2 
         Output: Shortest path
@@ -861,7 +1264,9 @@ class graph:
             #for d in chosen:
             #    tmp_dist[d.num] = np.inf
             
-            ind  = np.argmin(tmp_dist) 
+            #ind  = np.argmin(tmp_dist) 
+            min_Tmp = np.min(tmp_dist)
+            ind = np.where(min_Tmp==tmp_dist)[0][0]
             #self.node_list[ind].temp_parent= c
             c = self.node_list[ind]    
                 
@@ -873,7 +1278,7 @@ class graph:
                 print("Distances fixed:",tmp_dist)
             
               
-            if chosen[-1]==e:
+            if c==e:
                 break
                 
             
@@ -1607,7 +2012,10 @@ class node:
         self.name = "N" + str(self.num)
         return self.name
     
-    
+    def __lt__(self,other):
+        return self.num<other.num
+    def __gt__(self,other):
+        return self.num>other.num
     
     def addparent(self, parent, cost=[], capacity=[]):
         if cost == []:
@@ -1732,7 +2140,68 @@ def timecalc(func):
 
         return t2-t1
         
-    return wrap  
+    return wrap 
+
+    
+def create_file(arc_file_path="Data/OldenburgEdges.txt",congestion_path="Data/congestion.txt",output_file = "Data/OldenburgFinalTest.txt"):
+    
+    file_path = arc_file_path
+    congestion_path = congestion_path
+    
+   
+    
+    file = open(file_path, "r")
+    congest_file = open(congestion_path, "r")
+    
+    edge_dict = dict()
+    congest_dict = dict()
+    node_list=[]
+
+    for line in file:
+       
+        line_array = line.split()
+        node_list.append(int(line_array[1]))
+        node_list.append(int(line_array[2]))
+        line_array = [float(i) for i in line_array]
+        
+        key = str(int(line_array[1])) + "-" + str(int(line_array[2]))
+        rev_key = str(int(line_array[2])) + "-" + str(int(line_array[1]))
+        
+        edge_dict[key] = line_array[3]
+        edge_dict[rev_key] = line_array[3]
+    
+    arc_len = len(node_list)
+    node_len = len(set(node_list))
+    print(node_len)
+    file.close()
+        
+    for line in congest_file:
+        line_array = line.split()
+        line_array = [float(i) for i in line_array]
+        key = str(int(line_array[0])) + "-" + str(int(line_array[1]))
+        rev_key = str(int(line_array[1])) + "-" + str(int(line_array[0]))
+        
+        congest_dict[key] = line_array[2]
+        congest_dict[rev_key] = line_array[2]
+        
+    congest_file.close()
+    
+    
+    for key in congest_dict:
+        edge_dict[key] = edge_dict[key]*congest_dict[key]
+        
+    
+    
+    output_final = open(output_file, "w")
+    output_final.write(str(node_len)+" "+str(arc_len)+"\n")
+    for key in edge_dict:
+        sp = key.split("-")
+        sp.append(edge_dict[key])
+        line = str(sp[0]) + " " + str(sp[1]) + " " + str("%.4f"%(sp[2])) + " 1" + "\n"
+        output_final.write(line)
+    
+    output_final.close()
+    return node_list
 
 
 if __name__ == "__main__":
