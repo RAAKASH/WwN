@@ -4,12 +4,70 @@ cimport numpy as np
 cimport cython
 
 
+cpdef dijkstra(int n,np.ndarray[np.float64_t, ndim=1] dist,np.ndarray[long, ndim=1] temp_parent,int s,int e, dict g,int verbose):
+    dist[s] = 0
+    cdef np.ndarray[int, ndim=1] fixed = np.array([0]*n)
+    fixed[s]=1
+    
+    dijkstra_inner(n, fixed , dist,temp_parent,s,e, g, verbose)
+
+
+
+@cython.boundscheck(False) 
+@cython.wraparound(False) 
+cdef int dijkstra_inner(int n,np.ndarray[int, ndim=1] fixed,np.ndarray[np.float64_t, ndim=1] dist,np.ndarray[long, ndim=1] temp_parent,int s,int e, dict g,int verbose)except ? -1:
+    
+    
+    
+    
+  
+    cdef list chosen = [s]
+    cdef int iter1=1
+    while 1:
+        for c in chosen:
+            for j,cost in g[c].items():
+               if dist[j]>dist[c]+cost:
+                    dist[j]=dist[c]+cost
+                    temp_parent[j] = c
+                    
+            if verbose>=2:
+                print("Iteration:",iter1)
+                print("chosen")
+                iter1=iter1+1
+                print(fixed,c)
+        tmp = dist[fixed ==0]
+        
+        if len(tmp)==0:
+            path = []
+            break
+        else:
+            tmp_min = np.inf
+            #for i in range(len(tmp)):
+            #    if tmp_min>tmp[i]:
+            #        k=i
+                    
+            k = np.min(tmp)
+            #print(k)
+            k = np.where(dist==k)
+            k = k[0]
+            #chosen = []
+            for l in k:
+                
+                fixed[l]=1
+                chosen[0]=l
+                break
+        
+        if e in chosen:
+            break
+
+
 
 cpdef floyd_warshall(double D_shp,np.ndarray[np.float64_t, ndim=2] D,np.ndarray[long, ndim=2] nxt, int verbose=0):
     cdef int v = int(D_shp)
     #print(D,nxt)
     floyd_warshall_inner(v,D, nxt,verbose)
     return (D,nxt)
+
 
 @cython.boundscheck(False) 
 @cython.wraparound(False) 
