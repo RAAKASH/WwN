@@ -49,6 +49,7 @@ class graph:
             a[0] = a[0].replace("\n", "")
             a[0] = a[0].split()
             if len(a[0])>2:
+                 print("ehlll")
                  a[0] = [int(a[0][0])+n,int(a[0][1])+n,float(a[0][2]),float(a[0][3])]
 
             else:
@@ -745,9 +746,9 @@ class graph:
         self.dist = dist
         self.path = path
         if e ==None:
-            return (path,dist[e.num])
+            return (path,dist)
         else:
-            return (path,dist)  
+            return (path,dist[e.num])  
                     
     def dijkstra_naive(self,s,e=None,verbose=0):
         """
@@ -1161,7 +1162,7 @@ class graph:
             
         if D is None:
             # D is none implies Astar is dijkstra
-            pth,dist = dijkstra(self,s,e,verbose)
+            pth,dist = self.dijkstra(s,e,verbose)
             return (pth,dist)
             #D=np.zeros((len(self.node_list),len(self.node_list)))
         
@@ -2202,10 +2203,214 @@ def create_file(arc_file_path="Data/OldenburgEdges.txt",congestion_path="Data/co
     
     output_final.close()
     return node_list
-
+# %%  Shortest and Second Shortest paths using personal python code
 
 if __name__ == "__main__":
+    
+    s = 100
+    e = 200
+    #file = "Data/OldenburgFinalTest.txt"
+    #create_file(output_file=file)
+    gr = graph()
+    gr.clear()
+    #gr.read_file("Data/OldenburgFinal.txt")
+    #gr.read_file(file,overwrite=1)
+    gr.read_file("Oldenburg.txt")
+    #pth2 = gr.dijkstra_new(100,200)[0]
+    pth1 = gr.dijkstra(s,e)[0]
+    #pth2 = gr.second_best_path(pth1)[0]
+            
+#%%  Loading graph into networkx because dijkstra runs faster in networkx
+    """    
+    g = nx.DiGraph()
+    d = gr.getgraph()
+    g.add_nodes_from(d.keys())
+    weight = "cost"
+    s = 0
+    e = 7
+    
+    for k, v in d.items():
+        g.add_weighted_edges_from(([(k, t,k.getcost(t)) for t in v]))
    
+    
+    length,path = nx.single_source_dijkstra(g, gr.node_list[s], gr.node_list[e])
+
+    """
+
+#%% N-shortest path algorithms - Using Networkx
+    """   
+    verbose = 0;
+    n = 3; #Number of shortest paths required
+    A = [] #List of shortest paths
+    a = [] #List of shortest paths lengths
+    B = [] # Temporary list of paths in consideration
+    b = [] # Temporary list of paths lengths in consideration
+    
+    s = 100 # Start node
+    e = 200 # End node
+    A.append(nx.single_source_dijkstra(g,gr.node_list[s],gr.node_list[e])[1])
+    a.append(nx.single_source_dijkstra(g,gr.node_list[s],gr.node_list[e])[0])
+    
+    for k in tqdm(range(1,n)):
+        if verbose>=1:
+            print("*******Shortest path no:",k,"*********")
+        for i in (range(0,len(A[-1])-1)):
+            if verbose>=2:
+                print("Iteration ",i)
+            spurNode = A[-1][i]
+            rootPath = A[-1][0:i+1]
+            
+            for p in A:
+                if rootPath  == p[0:i+1]:
+                    #g.remove_edge(path_2[i],path_2[i+1])
+                    try:
+                        g.remove_edge(p[i],p[i+1])
+                    except:
+                        pass
+            
+            for n in rootPath:
+                if n!=spurNode:
+                    g.remove_node(n)
+            
+            length_tmp = gr.get_path_cost(rootPath)
+            try:
+            
+                #length2,spurPath = nx.single_source_dijkstra(g, spurNode, gr.node_list[e]);
+                length2,spurPath =nx.bidirectional_dijkstra(g, spurNode, gr.node_list[e]);
+                totalPath = rootPath[0:-1] + spurPath;
+                if totalPath not in B:
+                    b.append(length_tmp+length2)
+                    B.append(totalPath)
+                    
+            except:
+                pass
+            
+            if verbose>=2:
+                print("Restoring graph")
+            g = nx.DiGraph()
+            g.add_nodes_from(d.keys())
+       
+            for k, v in d.items():
+                #g.add_edges_from(([(k, t) for t in v]))
+                g.add_weighted_edges_from(([(k, t,k.getcost(t)) for t in v]))
+        
+        ind = np.argsort(b)
+        B = np.array(B)[ind].tolist()
+        b.sort()
+        A.append(list((B[0])))
+        a.append(b[0])
+        B.pop(0)
+        b.pop(0)
+    """
+            
+#%% 
+    #D,nxt = gr.floyd_warshall_cyth(1)
+#%% Code speed testing
+    """
+    PreProcess=np.load('PreProcess.npy')
+    D = PreProcess[0:6105,0:6105]
+    def heuristic(a,b):
+        return D[a.num,b.num]
+    #cProfile.run('gr.dijkstra_cyth(s,e)')
+    t1 = timecalc(gr.Astar)                  #1000,2000,D
+    t2 = timecalc(nx.bidirectional_dijkstra)#g, gr.node_list[1000], gr.node_list[2000])
+    t3 = timecalc(nx.astar_path)#g, gr.node_list[1000], gr.node_list[2000])
+    t4 = timecalc(gr.dijkstra_cyth)
+    t5 = timecalc(gr.dijkstra)
+    t6 = timecalc(gr.dijkstra_naive)
+    t7 = timecalc(gr.Astar)
+    s = 4100
+    e = 4305
+    t11 = t1(s,e,D)
+    t22 = t2(g, gr.node_list[s], gr.node_list[e])
+    t33 = t3(g, gr.node_list[s], gr.node_list[e], heuristic)
+    t44 = t4(s,e)
+    t55 = t5(s,e)
+    t66 = t6(s,e)
+    t77 = t7(s,e,D)
+    k = gr.Astar(s,e,D)
+    k2 = nx.bidirectional_dijkstra(g, gr.node_list[s], gr.node_list[e])
+    print(t22,t44,t55,t66,t77)
+    #Bi, Cyth, new, old, A star NEW
+    """
+#%% Speed testing
+    """
+    t5 = timecalc(gr.dijkstra)
+    t55 = t5(s,e)
+    print(t55)
+    t2 = timecalc(nx.bidirectional_dijkstra)#g, gr.node_list[1000], gr.node_list[2000])
+    t22 = t2(g, gr.node_list[s], gr.node_list[e])
+    print(t22)
+    """
+#%% N-shortest path algorithms
+    """
+    verbose = 0;
+    n = 10; #Number of shortest paths required
+    A = [] #List of shortest paths
+    a = [] #List of shortest paths lengths
+    B = [] # Temporary list of paths in consideration
+    b = [] # Temporary list of paths lengths in consideration
+    
+    s = 100 # Start node
+    e = 200 # End node
+    #
+    A_tmp1,a_tmp1 = gr.dijkstra(s,e)
+    A.append(A_tmp1)
+    a.append(a_tmp1)
+    for k in tqdm(range(1,n)):
+        deleted_nodes=[]
+        deleted_arcs =[]
+        if verbose>=1:
+            print("*******Shortest path no:",k,"*********")
+        for i in (range(0,len(A[-1])-1)):
+            if verbose>=2:
+                print("Iteration ",i)
+            spurNode = A[-1][i]
+            rootPath = A[-1][0:i+1]
+            
+            for p in A:
+                if rootPath  == p[0:i+1]:
+                    #g.remove_edge(path_2[i],path_2[i+1])
+                    if (p[i],p[i+1]) not in deleted_arcs:
+                        gr.delete_arc(p[i],p[i+1])
+                        deleted_arcs.append((p[i],p[i+1]))
+            
+            for n in rootPath:
+                if n!=spurNode:
+                    if n not in deleted_nodes:
+                        gr.delete_node(n)
+                        deleted_nodes.append(n)
+            
+            #try:
+            
+                #length2,spurPath = nx.single_source_dijkstra(g, spurNode, gr.node_list[e]);
+                #length2,spurPath =nx.bidirectional_dijkstra(g, spurNode, gr.node_list[e]);
+            spurPath,length2 =gr.dijkstra(spurNode,e);
+            totalPath = rootPath[0:-1] + spurPath;
+            if totalPath not in B:
+                gr.restore_cache()
+                length_tmp = gr.get_path_cost(rootPath)
+                b.append(length_tmp+length2)
+                B.append(totalPath)
+                
+            #except:
+            #    pass
+            
+            if verbose>=2:
+                print("Restoring graph")
+           
+            
+            deleted_nodes=[]
+            deleted_arcs =[]
+        gr.restore_cache()
+        ind = np.argsort(b)
+        B = np.array(B)[ind].tolist()
+        b.sort()
+        A.append(list((B[0])))
+        a.append(b[0])
+        B.pop(0)
+        b.pop(0)
+    """
     gr = graph()
     gr.clear()
     gr.read_file("Data/Quiz-4.txt")
@@ -2317,149 +2522,3 @@ if __name__ == "__main__":
     #gr.writegraph("Data/Work_schedule.txt")
     """
     
-    
-
-    #gr.plot(weight=1)
-    #gr.writegraph(name="Data/ford_fulk_weak.txt")
-    #gr.read_file("Data/Q2data.txt")
-    #gr.read_file("Data/Optimal_Loop.txt")
-    #gr.create_randgraph(100,0.1)
-    #gr.read_file("Data/OldenburgEdges_Pro.txt",overwrite=1)
-    
-    #gr.floyd_warshall_cyth()
-    #tmp_adj = gr.D#+np.around((np.random.rand(1000,1000)-0.5)*0.2,2);
-    #tmp_adj[:,:]=0
-    #np.fill_diagonal(tmp_adj,0)
-    #gr.Astar(0,7,tmp_adj,verbose=0)
-    
-    """
-    gr.create_nodes(10)
-    gr.addarc([0,1,1,1000])
-    gr.addarc([1,2,1,1000/6])
-    gr.addarc([1,3,1,1000/6])
-    gr.addarc([1,4,1,1000/6])
-    gr.addarc([1,5,1,1000/6])
-    gr.addarc([1,6,1,1000/6])
-    gr.addarc([1,7,1,1000/6])
-    gr.addarc([2,8,1,1000/6])
-    gr.addarc([3,8,1,1000/6])
-    gr.addarc([4,8,1,1000/6])
-    gr.addarc([5,8,1,1000/6])
-    gr.addarc([6,8,1,1000/6])
-    gr.addarc([7,8,1,1000/6])
-    gr.addarc([8,9,1,1000])
-    gr.getarclist()
-    """
-    
-    def f(g=10):
-        if g>0.1823:
-            return -1
-        else:
-            return 1
-    #print("\n",gr.binarysearch(f,tol=10**-6))
-    """
-    def f(g=10,gr=gr,size=len(gr.node_list)):
-        tmp = np.array(gr.arclist)
-        
-        tmp[:,2] =-tmp[:,2]+g*tmp[:,3]
-        g2 = graph()
-        g2.create_nodes(size)
-        g2.add_arcs(tmp,"node")
-        g2.floyd_warshall_cyth()
-        #print(np.diag(g2.D))
-        if (np.diag(g2.D)<0).any():
-            return 1
-        else:
-            return -1
-    """
-    
-    #print(f())
-    #print("\n",gr.binarysearch(gr.optimal_loop,max_val=1000,min_val=0,tol=10**-3,verbose=1))
-    #gr.Astar(0,3,(gr.D),verbose=2)
-    #gr.read_file('Data/Class_DP_ExNet.txt')
-    #gr.read_file('Data/Optimal_Loop.txt')
-    #gr.read_file("Data/neg_no_cycle.txt")
-    #gr.read_file("Data/neg_cycle.txt")
-    #gr.read_file("Data/neg_no_cycle.txt")
-    #gr.floyd_warshall_naive(1)
-    #gr.return_path(0,1)
-    #gr.read_file("Data/ExNet.txt")
-    #gr.read_file("Data/InClass-2.txt")
-    #gr.read_file("Data/Arbit.txt")
-    
-    #gr.create_randgraph(4,1,np.log)
-    #gr.create_randgraph(300,0.1)
-    #gr1 = gr.copy()
-
-    #"""
-    t = timecalc(gr.floyd_warshall_cyth)
-    t1 = timecalc(gr.floyd_warshall_naive)
-    t2 = timecalc(gr.mod_bell_ford)
-    t3 = timecalc(gr.return_path)
-    t4 = timecalc(gr.dijkstra)
-    t5 = timecalc(gr.DP_cyth)
-    t6 = timecalc(gr.Astar)
-    #t()
-    #"""
-    #gr.create_randgraph(500,0.01)
-    #pth = gr.mod_bell_ford(0,7)
-    #pth1 = gr.second_best_path(pth)
-    #t()
-    
-    """ 
-     7/7/21 Class code 
-    """
-    """
-    gr.read_file("Data/InClass-2.txt")
-    print("\n")
-    pth = gr.mod_bell_ford(0,7) #optimal path
-    
-    
-        
-    tmp_path=[]
-    tmp_cost=np.inf
-    
-    for i in range(len(pth)):
-        if pth[i] == pth[-1]:
-            break
-        tmp = pth[i].getcost(pth[i+1])
-        tmp_cost1 = pth[i].dist
-        #print("Shortest",pth[-1].dist-pth[i].dist)
-        
-        gr.replace_arc(pth[i],pth[i+1],np.inf)
-        #print(pth[i].getcost(pth[i+1]))
-        pth1 = gr.mod_bell_ford(pth[i],pth[i+1])
-        #print("New Path",pth[-1].dist)
-        
-        if tmp_cost>pth[-1].dist+tmp_cost1:
-            #print(pth1[-1].dist,pth[-1].dist)
-            #print(pth[-1].dist,tmp_cost1,pth[i],i)
-            tmp_cost = pth[-1].dist+tmp_cost1
-            tmp_path = pth[0:i]+pth1
-            print(tmp_cost,tmp_path)
-        else:
-            print(pth[-1].dist+tmp_cost1,pth[0:i]+pth1)
-           
-        
-        gr.replace_arc(pth[i],pth[i+1],tmp)
-        gr.mod_bell_ford(0,pth[-1])
-        
-    #gr.create_randgraph(10,0.5)
-    
-    """
-    """
-    arbitrage_node = 3
-    arbitrage_node  = gr.node_list[arbitrage_node]
-    
-    tmp_arclist = np.array(gr.arclist)
-    rout = tmp_arclist[tmp_arclist[:,1]==arbitrage_node,:]
-    rout[:,1] = gr.create_nodes(1)
-    gr.add_arcs(rout,"node")
-    pth = gr.search(arbitrage_node,4)[0]
-    print("\nCost:",gr.get_path_cost(pth))
-    """
-    #print(gr.arbitrage(1))
-    """
-    Check tramp steamer problem, code this shit
-    
-    """
