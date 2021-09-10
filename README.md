@@ -12,13 +12,13 @@ For the cython HTML generation type the below code.
  <h2>Algorithms available </h2>
  <ul style="list-style-type:disc;">
   <li>Search Algorithms: BFS, DFS</li>
-  <li>Shortest Path algorithms: (Modified) Bellman ford, Floyd Warshall, Dynamic programming, Second shortest path, arbitrage algorithm.</li>
+  <li>Shortest Path algorithms: (Modified) Bellman ford, Floyd Warshall, Dynamic programming, Second shortest path,  K-Shortest path algorithm (Yen's algorithm), arbitrage algorithm.</li>
   <li> Heuristics algoithm: A* (Dijkstras).
   <li> Miscellaneous: Optimal Loop, Binary search
   <li> Maximum Flow: Ford Fulkerson (Edmonds Karp Implementation), Push-relabel, maxflow-mincut.
   <li> Minimum cost flow: Capacity scalling, cycle cancelling.
   <li> Demand supply algos: Northwest, minimum cost, vogel's approximation.
-   <li> K-Shortest path algorithm (Yen's algorithm)
+   
 </ul>
 
 <h2> Upcoming algorithms </h2>
