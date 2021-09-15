@@ -718,7 +718,8 @@ class graph:
                 if verbose>=1:
                     print("No Path")
                 
-                return ([],np.inf)
+                break
+                #return ([],np.inf)
             cost,chosen = heapq.heappop(q)
             chosen = self.node_list[chosen]
             #print(chosen)
